@@ -9,10 +9,16 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      releases: write
+      id-token: write
     
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
@@ -56,6 +62,70 @@ jobs:
         mv build/app/outputs/flutter-apk/app-release.apk ${{ steps.version.outputs.APK_NAME }}
         ls -la ${{ steps.version.outputs.APK_NAME }}
 
+    - name: Check for existing release
+      id: check_release
+      run: |
+        TAG_NAME="${{ steps.version.outputs.TAG_NAME }}"
+        echo "Checking for existing release with tag: $TAG_NAME"
+        
+        # Use GitHub CLI if available, otherwise use curl
+        if command -v gh &> /dev/null; then
+          echo "Using GitHub CLI to check..."
+          if gh release view "$TAG_NAME" --repo "${{ github.repository }}" &> /dev/null; then
+            echo "RELEASE_EXISTS=true" >> $GITHUB_OUTPUT
+            echo "Release exists, will delete and recreate"
+          else
+            echo "RELEASE_EXISTS=false" >> $GITHUB_OUTPUT
+            echo "No existing release found"
+          fi
+        else
+          # Fallback to curl
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG_NAME")
+          
+          if [ "$RESPONSE" -eq 200 ]; then
+            echo "RELEASE_EXISTS=true" >> $GITHUB_OUTPUT
+            echo "Release exists, will delete and recreate"
+          else
+            echo "RELEASE_EXISTS=false" >> $GITHUB_OUTPUT
+            echo "No existing release found"
+          fi
+        fi
+
+    - name: Delete existing release if exists
+      if: steps.check_release.outputs.RELEASE_EXISTS == 'true'
+      run: |
+        TAG_NAME="${{ steps.version.outputs.TAG_NAME }}"
+        echo "Deleting existing release with tag: $TAG_NAME"
+        
+        # Use GitHub CLI if available
+        if command -v gh &> /dev/null; then
+          echo "Using GitHub CLI to delete..."
+          gh release delete "$TAG_NAME" --repo "${{ github.repository }}" --yes || true
+        else
+          # Get release ID first
+          RELEASE_ID=$(curl -s \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG_NAME" | \
+            jq -r '.id')
+          
+          if [ "$RELEASE_ID" != "null" ] && [ "$RELEASE_ID" != "" ]; then
+            echo "Deleting release with ID: $RELEASE_ID"
+            curl -X DELETE \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID"
+          fi
+        fi
+        
+        # Also delete the tag
+        echo "Deleting tag: $TAG_NAME"
+        git tag -d "$TAG_NAME" || true
+        git push origin ":refs/tags/$TAG_NAME" || true
+
     - name: Create GitHub Release
       id: create_release
       uses: softprops/action-gh-release@v1
@@ -80,6 +150,7 @@ jobs:
           *Built with ❤️ using GitHub Actions*
         draft: false
         prerelease: false
+        generate_release_notes: true
         files: |
           ${{ steps.version.outputs.APK_NAME }}
 
