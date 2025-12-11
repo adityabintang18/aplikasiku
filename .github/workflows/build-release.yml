@@ -1,0 +1,107 @@
+name: Build and Release Flutter APK
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.3'
+        channel: 'stable'
+        cache: true
+
+    - name: Install dependencies
+      run: flutter pub get
+
+    - name: Get version info from pubspec.yaml
+      id: version
+      run: |
+        # Extract version from pubspec.yaml
+        VERSION_LINE=$(grep "version:" pubspec.yaml)
+        VERSION_FULL=${VERSION_LINE#version: }
+        VERSION_FULL=$(echo $VERSION_FULL | xargs) # trim whitespace
+        
+        # Split version by '+' to get version name and build number
+        IFS='+' read -ra VERSION_PARTS <<< "$VERSION_FULL"
+        VERSION_NAME="${VERSION_PARTS[0]}"
+        BUILD_NUMBER="${VERSION_PARTS[1]}"
+        
+        echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_OUTPUT
+        echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+        echo "APK_NAME=app-$VERSION_NAME-$BUILD_NUMBER.apk" >> $GITHUB_OUTPUT
+        echo "TAG_NAME=v$VERSION_NAME+$BUILD_NUMBER" >> $GITHUB_OUTPUT
+        echo "Download URL: https://github.com/${{ github.repository }}/releases/download/v$VERSION_NAME+$BUILD_NUMBER/app-$VERSION_NAME-$BUILD_NUMBER.apk"
+        
+    - name: Build APK Release
+      run: flutter build apk --release
+
+    - name: Rename APK
+      run: |
+        mv build/app/outputs/flutter-apk/app-release.apk ${{ steps.version.outputs.APK_NAME }}
+        ls -la ${{ steps.version.outputs.APK_NAME }}
+
+    - name: Create GitHub Release
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.version.outputs.TAG_NAME }}
+        name: Release ${{ steps.version.outputs.VERSION_NAME }} (Build ${{ steps.version.outputs.BUILD_NUMBER }})
+        body: |
+          ## 🚀 Aplikasiku Release ${{ steps.version.outputs.VERSION_NAME }}
+          
+          **Build Number:** ${{ steps.version.outputs.BUILD_NUMBER }}
+          
+          ### 📱 Download
+          - **APK:** [app-${{ steps.version.outputs.VERSION_NAME }}-${{ steps.version.outputs.BUILD_NUMBER }}.apk](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.TAG_NAME }}/${{ steps.version.outputs.APK_NAME }})
+          
+          ### ✨ What's New
+          - Latest updates and improvements
+          - Bug fixes and optimizations
+          
+          ---
+          *Built with ❤️ using GitHub Actions*
+        draft: false
+        prerelease: false
+        files: |
+          ${{ steps.version.outputs.APK_NAME }}
+
+    - name: Extract Download URL
+      id: extract_url
+      run: |
+        DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.TAG_NAME }}/${{ steps.version.outputs.APK_NAME }}"
+        echo "DOWNLOAD_URL=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
+
+    - name: Update Version via Lumen API
+      run: |
+        # Update version to Lumen API
+        FULL_VERSION="${{ steps.version.outputs.VERSION_NAME }}+${{ steps.version.outputs.BUILD_NUMBER }}"
+        echo "Updating version: $FULL_VERSION"
+        curl -X POST ${{ secrets.API_BASE_URL }}/api/version/update \
+          -H "Authorization: Bearer ${{ secrets.API_KEY }}" \
+          -H "Content-Type: application/json" \
+          -d "{
+            \"platform\": \"android\",
+            \"version\": \"$FULL_VERSION\"
+          }"
+
+    - name: Show Success Message
+      run: |
+        echo "✅ APK built successfully!"
+        echo "📦 File: ${{ steps.version.outputs.APK_NAME }}"
+        echo "🏷️  Tag: ${{ steps.version.outputs.TAG_NAME }}"
+        echo "🔗 Release URL: ${{ steps.create_release.outputs.html_url }}"
+        echo "⬇️  Download URL: ${{ steps.extract_url.outputs.DOWNLOAD_URL }}"
+        echo "🚀 Version update sent to Lumen API"
