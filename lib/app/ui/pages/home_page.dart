@@ -9,6 +9,7 @@ import 'package:aplikasiku/app/ui/widgets/add_transaction_modal.dart';
 import 'package:aplikasiku/app/ui/widgets/loading_widget.dart';
 import 'package:aplikasiku/app/ui/widgets/error_widget.dart';
 import 'package:aplikasiku/app/ui/widgets/error_boundary.dart';
+import 'package:aplikasiku/app/ui/widgets/update_required_page.dart';
 import 'package:go_router/go_router.dart';
 import 'package:aplikasiku/app/core/errors/app_exception.dart';
 
@@ -49,103 +50,106 @@ class _HomePageState extends State<HomePage> {
       decimalDigits: 0,
     );
 
-    return SafeArea(
-      child: ErrorBoundary(
-        onError: (context, error, stack) => AppErrorWidget(
-          error: error as AppException,
-          onRetry: () => controller.refreshData(),
-        ),
-        child: Obx(() {
-          if (controller.isInitialLoading.value || _firstLoad) {
-            return const AppLoadingWidget(
-              message: 'Loading your dashboard...',
-              type: LoadingType.homePage,
+    return UpdateRequiredPage(
+      forceUpdateOnPageEnter: true,
+      child: SafeArea(
+        child: ErrorBoundary(
+          onError: (context, error, stack) => AppErrorWidget(
+            error: error as AppException,
+            onRetry: () => controller.refreshData(),
+          ),
+          child: Obx(() {
+            if (controller.isInitialLoading.value || _firstLoad) {
+              return const AppLoadingWidget(
+                message: 'Loading your dashboard...',
+                type: LoadingType.homePage,
+              );
+            }
+
+            final summary = controller.summary;
+            final transaksi = List<FinansialModel>.from(
+              controller.filteredTransactions,
             );
-          }
 
-          final summary = controller.summary;
-          final transaksi = List<FinansialModel>.from(
-            controller.filteredTransactions,
-          );
+            return SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Greeting card with padding
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: _buildGreetingCard(),
+                  ),
 
-          return SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Greeting card with padding
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: _buildGreetingCard(),
-                ),
+                  // Transaction type filter with padding
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: _buildTransactionTypeFilter(),
+                  ),
 
-                // Transaction type filter with padding
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: _buildTransactionTypeFilter(),
-                ),
+                  const SizedBox(height: 10),
 
-                const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: _buildSummaryCard(summary, currency),
+                  ),
+                  // Full width summary card (no padding constraint)
 
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: _buildSummaryCard(summary, currency),
-                ),
-                // Full width summary card (no padding constraint)
-
-                // Rest of content with padding
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildCategoryMenu(),
-                      const SizedBox(height: 24),
-                      Text(
-                        "Highlights",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: foreground,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildHighlightCard(),
-                      const SizedBox(height: 24),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "Recent Transactions",
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: foreground,
-                            ),
+                  // Rest of content with padding
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildCategoryMenu(),
+                        const SizedBox(height: 24),
+                        Text(
+                          "Highlights",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: foreground,
                           ),
-                          TextButton(
-                            onPressed: () => context.go('/transaction'),
-                            child: Text(
-                              "See All",
+                        ),
+                        const SizedBox(height: 12),
+                        _buildHighlightCard(),
+                        const SizedBox(height: 24),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "Recent Transactions",
                               style: TextStyle(
-                                color: primary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: foreground,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      ..._getRecentTransactions(transaksi, currency),
-                      const SizedBox(height: 24),
-                      _buildTipsCard(),
-                    ],
+                            TextButton(
+                              onPressed: () => context.go('/transaction'),
+                              child: Text(
+                                "See All",
+                                style: TextStyle(
+                                  color: primary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        ..._getRecentTransactions(transaksi, currency),
+                        const SizedBox(height: 24),
+                        _buildTipsCard(),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          );
-        }),
+                ],
+              ),
+            );
+          }),
+        ),
       ),
     );
   }
@@ -233,9 +237,8 @@ class _HomePageState extends State<HomePage> {
       final userName = (userInfo['name'] ?? "User").toString();
 
       final nameWords = userName.split(' ');
-      final displayedName = nameWords.length > 2
-          ? nameWords.sublist(0, 2).join(' ')
-          : userName;
+      final displayedName =
+          nameWords.length > 2 ? nameWords.sublist(0, 2).join(' ') : userName;
       final greeting = _getGreeting();
 
       return Container(
@@ -333,7 +336,7 @@ class _HomePageState extends State<HomePage> {
       if (controller.isSummaryLoading.value &&
           !controller.isInitialLoading.value) {
         return Container(
-          width: double.infinity,
+          width: MediaQuery.of(context).size.width,
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [primary, primary.withOpacity(0.8)],
@@ -512,15 +515,12 @@ class _HomePageState extends State<HomePage> {
       final summary = controller.summary;
 
       final total = summary['total'];
-      final thisMonth = total != null && total['balance'] != null
-          ? total['balance']
-          : 0;
-      final spent = total != null && total['expense'] != null
-          ? total['expense']
-          : 0;
-      final income = total != null && total['income'] != null
-          ? total['income']
-          : 0;
+      final thisMonth =
+          total != null && total['balance'] != null ? total['balance'] : 0;
+      final spent =
+          total != null && total['expense'] != null ? total['expense'] : 0;
+      final income =
+          total != null && total['income'] != null ? total['income'] : 0;
       final saved = (income - spent) > 0 ? (income - spent) : 0;
 
       final currency = NumberFormat.currency(
@@ -793,9 +793,9 @@ class _HomePageState extends State<HomePage> {
             TextButton(
               child: const Text('Add'),
               onPressed: () {
-                final name = nameController.text.trim();
-                if (name.isNotEmpty) {
-                  controller.addCategory(name);
+                final nama = nameController.text.trim();
+                if (nama.isNotEmpty) {
+                  controller.addJenisKategori(nama);
                   Navigator.of(context).pop();
                 }
               },

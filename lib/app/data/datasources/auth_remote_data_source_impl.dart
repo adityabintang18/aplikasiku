@@ -9,30 +9,35 @@ import '../../core/entities/update_profile_params.dart';
 import '../../core/entities/change_password_params.dart';
 import '../../core/entities/reset_password_params.dart';
 import '../../core/exceptions/app_exception.dart';
+import '../services/base_api_service.dart';
 
 /// Concrete implementation of remote data source for authentication API
-class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
-  final Dio _dio;
+class AuthRemoteDataSourceImpl extends BaseApiService
+    implements AuthRemoteDataSource {
   final Logger _logger;
-  final String _baseUrl;
 
-  AuthRemoteDataSourceImpl({
-    required Dio dio,
-    required String baseUrl,
-    Logger? logger,
-  }) : _dio = dio,
-       _baseUrl = baseUrl,
-       _logger = logger ?? Logger();
+  AuthRemoteDataSourceImpl({Logger? logger})
+      : _logger = logger ?? Logger(),
+        super();
 
   @override
-  String get baseUrl => _baseUrl;
-
-  @override
-  Map<String, String> get defaultHeaders => {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    'User-Agent': 'Aplikasiku/1.0.0',
-  };
+  Future<Map<String, String>> get defaultHeaders async {
+    try {
+      final version = await appVersion;
+      return {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'Aplikasiku/$version',
+      };
+    } catch (e) {
+      _logger.w('Could not get app version for User-Agent header: $e');
+      return {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'Aplikasiku/1.0.0',
+      };
+    }
+  }
 
   /// Helper method to handle API responses
   Future<Map<String, dynamic>> _handleResponse(Response response) async {
@@ -124,11 +129,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<Map<String, dynamic>> login(LoginParams params) async {
     _logger.i('Remote login attempt for: ${params.email}');
 
+    final headers = await defaultHeaders;
     final response = await _makeRequest(
-      () => _dio.post(
-        '$_baseUrl/auth/login',
+      () => client.post(
+        '$baseUrl/auth/login',
         data: params.toJson(),
-        options: Options(headers: defaultHeaders),
+        options: Options(headers: headers),
       ),
       customErrorMessage: 'Login failed',
     );
@@ -141,11 +147,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<Map<String, dynamic>> loginWithBiometric(String refreshToken) async {
     _logger.i('Remote biometric login attempt');
 
+    final headers = await defaultHeaders;
     final response = await _makeRequest(
-      () => _dio.post(
-        '$_baseUrl/auth/biometric',
+      () => client.post(
+        '$baseUrl/auth/login-with-token',
         data: {'refresh_token': refreshToken},
-        options: Options(headers: defaultHeaders),
+        options: Options(headers: headers),
       ),
       customErrorMessage: 'Biometric login failed',
     );
@@ -158,11 +165,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<Map<String, dynamic>> register(RegisterParams params) async {
     _logger.i('Remote register attempt for: ${params.email}');
 
+    final headers = await defaultHeaders;
     final response = await _makeRequest(
-      () => _dio.post(
-        '$_baseUrl/auth/register',
+      () => client.post(
+        '$baseUrl/auth/register',
         data: params.toJson(),
-        options: Options(headers: defaultHeaders),
+        options: Options(headers: headers),
       ),
       customErrorMessage: 'Registration failed',
     );
@@ -175,11 +183,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<Map<String, dynamic>> logout(String accessToken) async {
     _logger.i('Remote logout attempt');
 
+    final headers = await defaultHeaders;
     final response = await _makeRequest(
-      () => _dio.post(
-        '$_baseUrl/auth/logout',
+      () => client.post(
+        '$baseUrl/auth/logout',
         options: Options(
-          headers: {...defaultHeaders, 'Authorization': 'Bearer $accessToken'},
+          headers: {...headers, 'Authorization': 'Bearer $accessToken'},
         ),
       ),
       customErrorMessage: 'Logout failed',
@@ -193,11 +202,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<Map<String, dynamic>> refreshToken(String refreshToken) async {
     _logger.i('Remote token refresh attempt');
 
+    final headers = await defaultHeaders;
     final response = await _makeRequest(
-      () => _dio.post(
-        '$_baseUrl/auth/refresh',
+      () => client.post(
+        '$baseUrl/auth/refresh',
         data: {'refresh_token': refreshToken},
-        options: Options(headers: defaultHeaders),
+        options: Options(headers: headers),
       ),
       customErrorMessage: 'Token refresh failed',
     );
@@ -210,11 +220,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<Map<String, dynamic>> getCurrentUser(String accessToken) async {
     _logger.i('Remote get current user attempt');
 
+    final headers = await defaultHeaders;
     final response = await _makeRequest(
-      () => _dio.get(
-        '$_baseUrl/auth/user',
+      () => client.get(
+        '$baseUrl/profile',
         options: Options(
-          headers: {...defaultHeaders, 'Authorization': 'Bearer $accessToken'},
+          headers: {...headers, 'Authorization': 'Bearer $accessToken'},
         ),
       ),
       customErrorMessage: 'Failed to get user information',
@@ -231,12 +242,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   ) async {
     _logger.i('Remote update profile attempt');
 
+    final headers = await defaultHeaders;
     final response = await _makeRequest(
-      () => _dio.put(
-        '$_baseUrl/auth/profile',
+      () => client.post(
+        '$baseUrl/profile/update',
         data: params.toJson(),
         options: Options(
-          headers: {...defaultHeaders, 'Authorization': 'Bearer $accessToken'},
+          headers: {...headers, 'Authorization': 'Bearer $accessToken'},
         ),
       ),
       customErrorMessage: 'Profile update failed',
@@ -253,12 +265,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   ) async {
     _logger.i('Remote change password attempt');
 
+    final headers = await defaultHeaders;
     final response = await _makeRequest(
-      () => _dio.put(
-        '$_baseUrl/auth/password',
+      () => client.post(
+        '$baseUrl/auth/change-password',
         data: params.toJson(),
         options: Options(
-          headers: {...defaultHeaders, 'Authorization': 'Bearer $accessToken'},
+          headers: {...headers, 'Authorization': 'Bearer $accessToken'},
         ),
       ),
       customErrorMessage: 'Password change failed',
@@ -272,11 +285,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<Map<String, dynamic>> forgotPassword(String email) async {
     _logger.i('Remote forgot password attempt for: $email');
 
+    final headers = await defaultHeaders;
     final response = await _makeRequest(
-      () => _dio.post(
-        '$_baseUrl/auth/forgot-password',
+      () => client.post(
+        '$baseUrl/auth/forgot-password',
         data: {'email': email},
-        options: Options(headers: defaultHeaders),
+        options: Options(headers: headers),
       ),
       customErrorMessage: 'Forgot password request failed',
     );
@@ -289,11 +303,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<Map<String, dynamic>> resetPassword(ResetPasswordParams params) async {
     _logger.i('Remote reset password attempt for: ${params.email}');
 
+    final headers = await defaultHeaders;
     final response = await _makeRequest(
-      () => _dio.post(
-        '$_baseUrl/auth/reset-password',
+      () => client.post(
+        '$baseUrl/auth/reset-password',
         data: params.toJson(),
-        options: Options(headers: defaultHeaders),
+        options: Options(headers: headers),
       ),
       customErrorMessage: 'Password reset failed',
     );
@@ -305,10 +320,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<bool> checkConnectivity() async {
     try {
-      final response = await _dio.get(
-        '$_baseUrl/health',
+      final headers = await defaultHeaders;
+      final response = await client.get(
+        '$baseUrl/health',
         options: Options(
-          headers: defaultHeaders,
+          headers: headers,
           sendTimeout: const Duration(seconds: 5),
           receiveTimeout: const Duration(seconds: 5),
         ),

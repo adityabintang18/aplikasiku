@@ -1,8 +1,6 @@
 // Remote data source interface for authentication API calls
-import '../entities/auth_result.dart';
 import '../entities/login_params.dart';
 import '../entities/register_params.dart';
-import '../entities/user_entity.dart';
 import '../entities/update_profile_params.dart';
 import '../entities/change_password_params.dart';
 import '../entities/reset_password_params.dart';
@@ -51,6 +49,6 @@ abstract class AuthRemoteDataSource {
   /// Get API base URL
   String get baseUrl;
 
-  /// Get default headers for requests
-  Map<String, String> get defaultHeaders;
+  /// Get default headers for requests (async to support dynamic version)
+  Future<Map<String, String>> get defaultHeaders;
 }

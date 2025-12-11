@@ -6,6 +6,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'app/routes/app_routes.dart';
 import 'app/bindings/initial_binding.dart';
 import 'app/controllers/auth_controller.dart';
+import 'app/core/services/update_handler_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +19,19 @@ void main() async {
     ]);
 
     await dotenv.load(fileName: "lib/.env");
+
+    // Debug: Log environment variables
+    debugPrint('Environment variables loaded:');
+    debugPrint('API_BASE_URL: ${dotenv.env['API_BASE_URL']}');
+    debugPrint('APP_VERSION: ${dotenv.env['APP_VERSION']}');
+
+    // Verify required environment variables
+    if (dotenv.env['API_BASE_URL'] == null ||
+        dotenv.env['API_BASE_URL']!.isEmpty) {
+      debugPrint('ERROR: API_BASE_URL not found in .env file');
+      debugPrint('Available keys: ${dotenv.env.keys.toList()}');
+      throw Exception('API_BASE_URL is required in .env file');
+    }
 
     // Initialize AuthController first for routing
     Get.put(AuthController());
@@ -67,6 +81,15 @@ class ShadAppWithRoutes extends StatelessWidget {
       routeInformationParser: router.routeInformationParser,
       routeInformationProvider: router.routeInformationProvider,
       debugShowCheckedModeBanner: false,
+      // Wrap with Navigator to enable global dialog access
+      builder: (context, child) => Navigator(
+        key: navigatorKey,
+        onGenerateRoute: (routeSettings) {
+          return MaterialPageRoute(
+            builder: (context) => child!,
+          );
+        },
+      ),
     );
   }
 }

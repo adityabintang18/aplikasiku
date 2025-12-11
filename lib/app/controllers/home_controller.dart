@@ -4,12 +4,13 @@ import 'package:aplikasiku/app/data/services/financial_service.dart';
 import 'package:aplikasiku/app/data/services/auth_service.dart';
 import 'package:logger/logger.dart';
 import 'package:aplikasiku/app/data/models/financial_model.dart';
-import 'package:aplikasiku/app/mixins/update_handler_mixin.dart';
 import 'package:aplikasiku/app/utils/exceptions.dart';
 import 'package:aplikasiku/app/core/services/error_handler_service.dart';
+import 'package:aplikasiku/app/core/services/update_handler_service.dart';
 import 'package:aplikasiku/app/core/errors/app_exception.dart';
+import 'package:aplikasiku/app/ui/widgets/update_required_page.dart';
 
-class HomeController extends GetxController with UpdateHandlerMixin {
+class HomeController extends GetxController with UpdateRequiredMixin {
   final _logger = Logger();
   final FinansialService _financialService = FinansialService();
   final AuthService _authService = AuthService();
@@ -45,6 +46,8 @@ class HomeController extends GetxController with UpdateHandlerMixin {
   @override
   void onInit() {
     super.onInit();
+    // Force update check when controller initializes
+    checkForUpdatesOnInit();
     _initializeData();
   }
 
@@ -52,56 +55,125 @@ class HomeController extends GetxController with UpdateHandlerMixin {
     isInitialLoading.value = true;
     try {
       // Load data with individual error handling to prevent cascade failures
-      await fetchUserInfo().catchError((e) {
-        _logger.w('UserInfo failed: $e');
-        // Set default user info for demo
-        userInfo.value = {'name': 'Demo User', 'email': 'demo@example.com'};
-      });
+      await _safeFetchUserInfo();
+      await _safeFetchTransactionTypes();
+      await _safeFetchCategories();
+      await _safeFetchDailyTip();
+      await _safeFetchSummary();
+      await _safeFetchAllTransaksi();
+      await _safeFilterTransaksiList();
+    } catch (e) {
+      _logger.e("Error onInit: $e");
+    } finally {
+      isInitialLoading.value = false;
+    }
+  }
 
-      await fetchTransactionTypes().catchError((e) {
+  /// Safe fetch methods that handle update exceptions specifically
+  Future<void> _safeFetchUserInfo() async {
+    try {
+      await fetchUserInfo();
+    } catch (e) {
+      if (e is AppUpdateRequiredException) {
+        _logger.w('UserInfo: Update required, re-throwing to trigger dialog');
+        rethrow; // Re-throw to trigger update dialog
+      } else {
+        _logger.w('UserInfo failed: $e');
+        userInfo.value = {'name': 'Demo User', 'email': 'demo@example.com'};
+      }
+    }
+  }
+
+  Future<void> _safeFetchTransactionTypes() async {
+    try {
+      await fetchTransactionTypes();
+    } catch (e) {
+      if (e is AppUpdateRequiredException) {
+        _logger.w(
+            'TransactionTypes: Update required, re-throwing to trigger dialog');
+        rethrow;
+      } else {
         _logger.w('TransactionTypes failed: $e');
-        // Set default transaction types
         transactionTypes.value = [
           {'id': '1', 'name': 'Income', 'type': 'income'},
           {'id': '2', 'name': 'Expense', 'type': 'expense'},
           {'id': '3', 'name': 'Transfer', 'type': 'transfer'},
         ];
-      });
+      }
+    }
+  }
 
-      await fetchCategories().catchError((e) {
+  Future<void> _safeFetchCategories() async {
+    try {
+      await fetchCategories();
+    } catch (e) {
+      if (e is AppUpdateRequiredException) {
+        _logger.w('Categories: Update required, re-throwing to trigger dialog');
+        rethrow;
+      } else {
         _logger.w('Categories failed: $e');
-        // Set default categories
         categories.value = [
           {'id': 14, 'nama': 'Gaji', 'deskripsi': 'Pemasukan'},
           {'id': 18, 'nama': 'Makanan & Minuman', 'deskripsi': 'Pengeluaran'},
         ];
-      });
+      }
+    }
+  }
 
-      await fetchDailyTip().catchError((e) {
+  Future<void> _safeFetchDailyTip() async {
+    try {
+      await fetchDailyTip();
+    } catch (e) {
+      if (e is AppUpdateRequiredException) {
+        _logger.w('DailyTip: Update required, re-throwing to trigger dialog');
+        rethrow;
+      } else {
         _logger.w('DailyTip failed: $e');
-        // Set default tip
         dailyTip.value = 'Welcome to Aplikasiku!';
-      });
+      }
+    }
+  }
 
-      // Load financial data with fallback
-      await fetchSummary().catchError((e) {
+  Future<void> _safeFetchSummary() async {
+    try {
+      await fetchSummary();
+    } catch (e) {
+      if (e is AppUpdateRequiredException) {
+        _logger.w('Summary: Update required, re-throwing to trigger dialog');
+        rethrow;
+      } else {
         _logger.w('Summary failed: $e');
         summary.value = {'pemasukan': 0, 'pengeluaran': 0, 'saldo': 0};
-      });
+      }
+    }
+  }
 
-      await fetchAllTransaksi().catchError((e) {
+  Future<void> _safeFetchAllTransaksi() async {
+    try {
+      await fetchAllTransaksi();
+    } catch (e) {
+      if (e is AppUpdateRequiredException) {
+        _logger
+            .w('Transactions: Update required, re-throwing to trigger dialog');
+        rethrow;
+      } else {
         _logger.w('Transactions failed: $e');
         allTransaksiList.value = [];
-      });
+      }
+    }
+  }
 
-      await filterTransaksiList().catchError((e) {
+  Future<void> _safeFilterTransaksiList() async {
+    try {
+      await filterTransaksiList();
+    } catch (e) {
+      if (e is AppUpdateRequiredException) {
+        _logger.w('Filter: Update required, re-throwing to trigger dialog');
+        rethrow;
+      } else {
         _logger.w('Filter failed: $e');
         filteredTransaksiList.value = [];
-      });
-    } catch (e) {
-      _logger.e("Error onInit: $e");
-    } finally {
-      isInitialLoading.value = false;
+      }
     }
   }
 
@@ -114,20 +186,12 @@ class HomeController extends GetxController with UpdateHandlerMixin {
         () => _authService.getUserInfo(),
         showSnackbar: true,
       );
-
-      if (result != null) {
-        userInfo.value = result;
-        _logger.i('User info loaded: $result');
-      }
+      userInfo.value = result;
+      _logger.i('User info loaded: $result');
     } catch (e) {
       _logger.e('Error in fetchUserInfo: $e');
       if (e is AppUpdateRequiredException) {
-        _logger.w('AppUpdateRequiredException caught directly');
-        handleUpdateException();
-      } else if (e is dio.DioException &&
-          e.error is AppUpdateRequiredException) {
-        _logger.w('AppUpdateRequiredException caught in DioException.error');
-        handleUpdateException();
+        rethrow; // Re-throw to trigger update dialog
       }
     } finally {
       isUserInfoLoading.value = false;
@@ -156,8 +220,9 @@ class HomeController extends GetxController with UpdateHandlerMixin {
         }
       }
     } catch (e) {
-      if (e is dio.DioException && e.error is AppUpdateRequiredException) {
-        handleUpdateException();
+      _logger.e('Error in fetchTransactionTypes: $e');
+      if (e is AppUpdateRequiredException) {
+        rethrow; // Re-throw to trigger update dialog
       }
     } finally {
       isTransactionTypesLoading.value = false;
@@ -179,8 +244,9 @@ class HomeController extends GetxController with UpdateHandlerMixin {
         _logger.i('Categories loaded: ${result.length} items | JSON: $result');
       }
     } catch (e) {
+      _logger.e('Error in fetchCategories: $e');
       if (e is AppUpdateRequiredException) {
-        handleUpdateException();
+        rethrow; // Re-throw to trigger update dialog
       }
     } finally {
       isCategoriesLoading.value = false;
@@ -201,8 +267,9 @@ class HomeController extends GetxController with UpdateHandlerMixin {
         _logger.i('Daily tip loaded: ${dailyTip.value}');
       }
     } catch (e) {
-      if (e is dio.DioException && e.error is AppUpdateRequiredException) {
-        handleUpdateException();
+      _logger.e('Error in fetchDailyTip: $e');
+      if (e is AppUpdateRequiredException) {
+        rethrow; // Re-throw to trigger update dialog
       }
     } finally {
       isDailyTipLoading.value = false;
@@ -231,11 +298,9 @@ class HomeController extends GetxController with UpdateHandlerMixin {
       summary.value = result;
       _logger.i('Summary Loaded: $result');
     } catch (e) {
+      _logger.e('Error in fetchSummary: $e');
       if (e is AppUpdateRequiredException) {
-        _logger.w(
-          'Caught AppUpdateRequiredException in fetchSummary, showing dialog',
-        );
-        handleUpdateException();
+        rethrow; // Re-throw to trigger update dialog
       }
     } finally {
       isSummaryLoading.value = false;
@@ -255,8 +320,9 @@ class HomeController extends GetxController with UpdateHandlerMixin {
       allTransaksiList.value = result;
       _logger.i('All Transactions loaded: ${allTransaksiList.length} items');
     } catch (e) {
-      if (e is dio.DioException && e.error is AppUpdateRequiredException) {
-        handleUpdateException();
+      _logger.e('Error in fetchAllTransaksi: $e');
+      if (e is AppUpdateRequiredException) {
+        rethrow; // Re-throw to trigger update dialog
       }
     } finally {
       isTransactionsLoading.value = false;
@@ -270,15 +336,13 @@ class HomeController extends GetxController with UpdateHandlerMixin {
     try {
       List<FinansialModel> transactions;
       if (filterId.isEmpty || filterId == 'all') {
-        transactions =
-            await _errorHandler.handleError(
+        transactions = await _errorHandler.handleError(
               () => _financialService.getAll(jenisKategori: null),
               showSnackbar: false,
             ) ??
             [];
       } else {
-        transactions =
-            await _errorHandler.handleError(
+        transactions = await _errorHandler.handleError(
               () => _financialService.getAll(jenisKategori: filterId),
               showSnackbar: false,
             ) ??
@@ -297,12 +361,11 @@ class HomeController extends GetxController with UpdateHandlerMixin {
 
       filteredTransaksiList.value = transactions;
     } catch (e) {
-      if (e is dio.DioException && e.error is AppUpdateRequiredException) {
-        handleUpdateException();
-      } else {
-        _logger.e('Error filterTransaksiList', error: e);
-        filteredTransaksiList.value = [];
+      _logger.e('Error filterTransaksiList', error: e);
+      if (e is AppUpdateRequiredException) {
+        rethrow; // Re-throw to trigger update dialog
       }
+      filteredTransaksiList.value = [];
     } finally {
       isTransactionsLoading.value = false;
     }
@@ -334,8 +397,9 @@ class HomeController extends GetxController with UpdateHandlerMixin {
         'Transactions by category loaded: ${filteredTransaksiList.length} items for jenis_kategori: $jenisKategori',
       );
     } catch (e) {
-      if (e is dio.DioException && e.error is AppUpdateRequiredException) {
-        handleUpdateException();
+      _logger.e('Error in fetchTransactionsByCategory: $e');
+      if (e is AppUpdateRequiredException) {
+        rethrow; // Re-throw to trigger update dialog
       }
     } finally {
       isTransactionsLoading.value = false;
@@ -358,41 +422,13 @@ class HomeController extends GetxController with UpdateHandlerMixin {
       filteredTransaksiList.value = [];
 
       // Load all data with the filter applied
-      await fetchUserInfo().catchError((e) {
-        _logger.w('UserInfo failed during filter refresh: $e');
-        userInfo.value = {'name': 'Demo User', 'email': 'demo@example.com'};
-      });
-
-      await fetchTransactionTypes().catchError((e) {
-        _logger.w('TransactionTypes failed during filter refresh: $e');
-        // Keep existing transaction types
-      });
-
-      await fetchCategories().catchError((e) {
-        _logger.w('Categories failed during filter refresh: $e');
-        // Keep existing categories
-      });
-
-      await fetchDailyTip().catchError((e) {
-        _logger.w('DailyTip failed during filter refresh: $e');
-        // Keep existing tip
-      });
-
-      // Load financial data with filter applied
-      await fetchSummary(typeId == 'all' ? null : typeId).catchError((e) {
-        _logger.w('Summary failed during filter refresh: $e');
-        summary.value = {'pemasukan': 0, 'pengeluaran': 0, 'saldo': 0};
-      });
-
-      await fetchAllTransaksi().catchError((e) {
-        _logger.w('Transactions failed during filter refresh: $e');
-        allTransaksiList.value = [];
-      });
-
-      await filterTransaksiList().catchError((e) {
-        _logger.w('Filter failed during filter refresh: $e');
-        filteredTransaksiList.value = [];
-      });
+      await _safeFetchUserInfo();
+      await _safeFetchTransactionTypes();
+      await _safeFetchCategories();
+      await _safeFetchDailyTip();
+      await _safeFetchSummary();
+      await _safeFetchAllTransaksi();
+      await _safeFilterTransaksiList();
     } catch (e) {
       _logger.e('Error in setTransactionTypeFilter', error: e);
     } finally {
@@ -416,18 +452,28 @@ class HomeController extends GetxController with UpdateHandlerMixin {
   /// Called when page is entered - refresh data automatically
   Future<void> onPageEnter() async {
     _logger.i('HomeController: onPageEnter called - refreshing data');
+    // Force update check on page enter
+    forceUpdateCheck();
     await refreshData();
   }
 
-  // Test method to manually trigger update page
-  void testUpdatePage() {
-    _logger.i('Manually triggering update page for testing');
-    handleUpdateException();
+  /// Add new transaction type (jenis transaksi) to /ref/jenis endpoint
+  Future<void> addJenisKategori(String nama, {String? deskripsi}) async {
+    final result = await _errorHandler.handleError(
+      () => _authService.addTransactionTypesLegacy(nama, deskripsi: deskripsi),
+      showSnackbar: true,
+    );
+
+    if (result['success'] == true) {
+      await refreshData();
+      _errorHandler.showSuccessSnackbar('Transaction type added successfully');
+    }
   }
 
-  Future<void> addCategory(String name, {String? deskripsi}) async {
+  /// Add new transaction category (kategori transaksi) to /ref/kategori endpoint
+  Future<void> addCategory(String nama, {String? deskripsi}) async {
     final result = await _errorHandler.handleError(
-      () => _authService.addTransactionTypes(name, deskripsi: deskripsi),
+      () => _authService.addCategoryLegacy(nama: nama, deskripsi: deskripsi),
       showSnackbar: true,
     );
 

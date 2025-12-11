@@ -6,11 +6,10 @@ import 'package:aplikasiku/app/controllers/statistic_controller.dart';
 import 'package:aplikasiku/app/controllers/home_controller.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../widgets/loading_widget.dart';
-import '../widgets/error_widget.dart';
-import '../widgets/error_boundary.dart';
-import '../../core/errors/app_exception.dart';
+import 'package:aplikasiku/app/utils/helpers.dart';
 
 class StatisticPage extends GetView<StatisticController> {
+  StatisticPage({super.key});
   static const Color background = Color(0xFFFFFFFF);
   static const Color foreground = Color(0xFF0F172A);
   static const Color muted = Color(0xFF64748B);
@@ -33,16 +32,9 @@ class StatisticPage extends GetView<StatisticController> {
   final RxString selectedTab = 'overview'.obs;
   final RxBool isAddingBudget = false.obs;
 
-  // Buffer filter state untuk modal filter UI (sementara, diterapkan saat tekan Terapkan)
-  final RxString filterTypeBuffer = 'all'.obs;
-  final RxString transactionTypeFilterBuffer = 'all'.obs;
-  final RxInt monthBuffer = 0.obs;
-  final RxInt yearBuffer = 0.obs;
-
   // Access HomeController to get transaction types for filtering
-  final HomeController? homeController = Get.isRegistered<HomeController>()
-      ? Get.find<HomeController>()
-      : null;
+  final HomeController? homeController =
+      Get.isRegistered<HomeController>() ? Get.find<HomeController>() : null;
 
   final List<Color> chartColors = [
     const Color(0xFF14B8A6),
@@ -55,11 +47,6 @@ class StatisticPage extends GetView<StatisticController> {
 
   @override
   Widget build(BuildContext context) {
-    // Call onPageEnter when page is built (refreshes data every time page is entered)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      controller.onPageEnter();
-    });
-
     return SafeArea(
       child: Obx(() {
         if (controller.isLoading.value) {
@@ -69,94 +56,125 @@ class StatisticPage extends GetView<StatisticController> {
           );
         }
 
-        return SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Statistics',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w600,
-                    color: foreground,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                GestureDetector(
-                  onTap: () => _showFilterModal(context),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: background,
-                      border: Border.all(color: border),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.filter_list_rounded,
-                          color: primary,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Obx(() {
-                            final year = controller.selectedYear.value;
-                            final month = controller.selectedMonth.value;
-                            final typeId =
-                                controller.selectedJenisKategori.value;
-                            String typeLabel = 'All Types';
-                            if (typeId != 'all' && homeController != null) {
-                              final type = homeController!.transactionTypes
-                                  .firstWhereOrNull(
-                                    (t) => t['id'].toString() == typeId,
-                                  );
-                              typeLabel =
-                                  type?['nama'] ?? type?['name'] ?? 'Unknown';
-                            }
-                            return Text(
-                              'Filter: ${DateFormat('MMMM yyyy', 'id_ID').format(DateTime(year, month))} • $typeLabel',
-                              style: TextStyle(fontSize: 14, color: foreground),
-                            );
-                          }),
-                        ),
-                        Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          color: muted,
-                          size: 20,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                ShadTabs<String>(
-                  value: selectedTab.value,
-                  onChanged: (value) {
-                    selectedTab.value = value;
-                  },
-                  tabs: const [
-                    ShadTab(value: 'overview', child: Text('Overview')),
-                    ShadTab(value: 'category', child: Text('Category Details')),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Obx(
-                  () => selectedTab.value == 'overview'
-                      ? _buildOverviewTab()
-                      : _buildCategoryTab(),
-                ),
-              ],
-            ),
-          ),
-        );
+        return _buildMainContent();
       }),
+    );
+  }
+
+  Widget _buildMainContent() {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(),
+            const SizedBox(height: 20),
+            _buildFilterSection(),
+            const SizedBox(height: 24),
+            _buildTabsSection(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Text(
+      'Statistics',
+      style: TextStyle(
+        fontSize: 24,
+        fontWeight: FontWeight.w600,
+        color: foreground,
+      ),
+    );
+  }
+
+  Widget _buildFilterSection() {
+    return GestureDetector(
+      onTap: () {
+        if (Get.context != null) {
+          _showFilterModal(Get.context!);
+        }
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
+        decoration: BoxDecoration(
+          color: background,
+          border: Border.all(color: border),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.filter_list_rounded,
+              color: primary,
+              size: 18,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Obx(() {
+                return _buildFilterText();
+              }),
+            ),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: muted,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterText() {
+    final year = controller.selectedYear.value;
+    final month = controller.selectedMonth.value;
+    final typeId = controller.selectedJenisKategori.value;
+    String typeLabel = 'All Types';
+
+    if (typeId != 'all' && homeController != null) {
+      try {
+        final type = homeController!.transactionTypes.firstWhereOrNull(
+          (t) => t['id'].toString() == typeId,
+        );
+        typeLabel = type?['nama'] ?? type?['name'] ?? 'Unknown';
+      } catch (e) {
+        typeLabel = 'Unknown Type';
+      }
+    }
+
+    return Text(
+      'Filter: ${DateFormat('MMMM yyyy', 'id_ID').format(DateTime(year, month))} • $typeLabel',
+      style: TextStyle(fontSize: 14, color: foreground),
+    );
+  }
+
+  Widget _buildTabsSection() {
+    return Column(
+      children: [
+        ShadTabs<String>(
+          value: selectedTab.value,
+          onChanged: (value) {
+            selectedTab.value = value;
+          },
+          tabs: const [
+            ShadTab(value: 'overview', child: Text('Overview')),
+            ShadTab(value: 'category', child: Text('Category Details')),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Obx(
+          () => selectedTab.value == 'overview'
+              ? _buildOverviewTab()
+              : _buildCategoryTab(),
+        ),
+      ],
     );
   }
 
@@ -192,23 +210,31 @@ class StatisticPage extends GetView<StatisticController> {
       children: [
         _buildSummaryCard(
           'Income',
-          currency.format(controller.totalIncome),
+          _safeFormatCurrency(controller.totalIncome),
           Colors.green,
         ),
         const SizedBox(height: 12),
         _buildSummaryCard(
           'Expense',
-          currency.format(controller.totalExpense),
+          _safeFormatCurrency(controller.totalExpense),
           Colors.red,
         ),
         const SizedBox(height: 12),
         _buildSummaryCard(
           'Balance',
-          currency.format(controller.netBalance),
+          _safeFormatCurrency(controller.netBalance),
           primary,
         ),
       ],
     );
+  }
+
+  String _safeFormatCurrency(int amount) {
+    try {
+      return currency.format(amount);
+    } catch (e) {
+      return 'Rp ${formatAmountDisplay(amount.toDouble())}';
+    }
   }
 
   Widget _buildOverviewTab() {
@@ -220,21 +246,27 @@ class StatisticPage extends GetView<StatisticController> {
           title: 'Income Distribution',
           isEmpty: controller.incomeDistributionData.isEmpty,
           data: controller.incomeDistributionData,
-          getCategoryLabel: (item) =>
-              controller.getCategoryLabel(item['category']),
+          getCategoryLabel: (item) => _safeGetCategoryLabel(item['category']),
         ),
         const SizedBox(height: 16),
         _buildDistributionChart(
           title: 'Expense Distribution',
           isEmpty: controller.expenseData.isEmpty,
           data: controller.expenseData,
-          getCategoryLabel: (item) =>
-              controller.getCategoryLabel(item['category']),
+          getCategoryLabel: (item) => _safeGetCategoryLabel(item['category']),
         ),
         const SizedBox(height: 16),
         _buildIncomeVsExpenseBarChart(),
       ],
     );
+  }
+
+  String _safeGetCategoryLabel(dynamic category) {
+    try {
+      return controller.getCategoryLabel(category);
+    } catch (e) {
+      return 'Unknown Category';
+    }
   }
 
   Widget _buildDistributionChart({
@@ -272,6 +304,16 @@ class StatisticPage extends GetView<StatisticController> {
                 ),
               ),
             )
+          else if (data.isEmpty)
+            SizedBox(
+              height: 160,
+              child: Center(
+                child: Text(
+                  'No data available',
+                  style: TextStyle(color: muted, fontSize: 14),
+                ),
+              ),
+            )
           else ...[
             SizedBox(
               height: 200,
@@ -282,59 +324,79 @@ class StatisticPage extends GetView<StatisticController> {
                   ),
                   sectionsSpace: 2,
                   centerSpaceRadius: 40,
-                  sections: data.asMap().entries.map((entry) {
-                    final item = entry.value;
-                    final totalValue = data
-                        .map((d) => (d['amount'] ?? 0).toDouble())
-                        .where((v) => v > 0)
-                        .fold(0.0, (a, b) => a + b);
-
-                    return PieChartSectionData(
-                      value: (item['amount'] ?? 0).toDouble(),
-                      color: chartColors[entry.key % chartColors.length],
-                      radius: totalValue > 0 ? 60 : 0,
-                      title: '',
-                    );
-                  }).toList(),
+                  sections: _buildPieChartSections(data),
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            Wrap(
-              spacing: 16,
-              runSpacing: 8,
-              children: data.asMap().entries.map((entry) {
-                final item = entry.value;
-                final label = getCategoryLabel(item);
-                return Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: chartColors[entry.key % chartColors.length],
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(label, style: TextStyle(fontSize: 12, color: muted)),
-                    const SizedBox(width: 8),
-                    Text(
-                      currency.format(item['amount'] ?? 0),
-                      style: TextStyle(fontSize: 12, color: foreground),
-                    ),
-                  ],
-                );
-              }).toList(),
-            ),
+            _buildChartLegend(data, getCategoryLabel),
           ],
         ],
       ),
     );
   }
 
+  List<PieChartSectionData> _buildPieChartSections(
+      List<Map<String, dynamic>> data) {
+    return data.asMap().entries.map((entry) {
+      final item = entry.value;
+      final amount = (item['amount'] ?? 0).toDouble();
+      final totalValue = data
+          .map((d) => (d['amount'] ?? 0).toDouble())
+          .where((v) => v > 0)
+          .fold(0.0, (a, b) => a + b);
+
+      return PieChartSectionData(
+        value: amount,
+        color: chartColors[entry.key % chartColors.length],
+        radius: totalValue > 0 ? 60 : 0,
+        title: '',
+      );
+    }).toList();
+  }
+
+  Widget _buildChartLegend(
+    List<Map<String, dynamic>> data,
+    String Function(Map<String, dynamic>) getCategoryLabel,
+  ) {
+    return Wrap(
+      spacing: 16,
+      runSpacing: 8,
+      children: data.asMap().entries.map((entry) {
+        final item = entry.value;
+        final label = getCategoryLabel(item);
+        final amount = item['amount'] ?? 0;
+
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                color: chartColors[entry.key % chartColors.length],
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(fontSize: 12, color: muted),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              _safeFormatCurrency(amount),
+              style: TextStyle(fontSize: 12, color: foreground),
+            ),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
   Widget _buildIncomeVsExpenseBarChart() {
+    final data = controller.incomeVsExpenseData;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -354,101 +416,114 @@ class StatisticPage extends GetView<StatisticController> {
             ),
           ),
           const SizedBox(height: 16),
-          SizedBox(
-            height: 200,
-            child: BarChart(
-              BarChartData(
-                barTouchData: BarTouchData(
-                  enabled: true,
-                  touchTooltipData: BarTouchTooltipData(),
+          if (data.isEmpty)
+            SizedBox(
+              height: 200,
+              child: Center(
+                child: Text(
+                  'No data available',
+                  style: TextStyle(color: muted, fontSize: 14),
                 ),
-                alignment: BarChartAlignment.spaceAround,
-                maxY: () {
-                  final values = controller.incomeVsExpenseData
-                      .expand<num>((e) => [e['income'] ?? 0, e['expense'] ?? 0])
-                      .where((v) => v > 0)
-                      .toList();
-                  if (values.isEmpty) return 5500.0;
-                  return values.reduce((a, b) => a > b ? a : b).toDouble() *
-                      1.2;
-                }(),
-                barGroups: controller.incomeVsExpenseData.asMap().entries.map((
-                  entry,
-                ) {
-                  final data = entry.value;
-                  return BarChartGroupData(
-                    x: entry.key,
-                    barRods: [
-                      BarChartRodData(
-                        toY: (data['income'] ?? 0).toDouble(),
-                        color: const Color(0xFF14B8A6),
-                        width: 12,
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(4),
-                          topRight: Radius.circular(4),
-                        ),
+              ),
+            )
+          else
+            SizedBox(
+              height: 200,
+              child: BarChart(
+                BarChartData(
+                  barTouchData: BarTouchData(
+                    enabled: true,
+                    touchTooltipData: BarTouchTooltipData(),
+                  ),
+                  alignment: BarChartAlignment.spaceAround,
+                  maxY: _calculateMaxY(data),
+                  barGroups: _buildBarChartGroups(data),
+                  titlesData: FlTitlesData(
+                    show: true,
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (value, meta) {
+                          final index = value.toInt();
+                          if (index < data.length) {
+                            return Text(
+                              data[index]['month'] ?? '',
+                              style: TextStyle(fontSize: 12, color: muted),
+                            );
+                          }
+                          return const Text('');
+                        },
                       ),
-                      BarChartRodData(
-                        toY: (data['expense'] ?? 0).toDouble(),
-                        color: const Color(0xFFEF4444),
-                        width: 12,
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(4),
-                          topRight: Radius.circular(4),
-                        ),
-                      ),
-                    ],
-                  );
-                }).toList(),
-                titlesData: FlTitlesData(
-                  show: true,
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) {
-                        if (value.toInt() <
-                            controller.incomeVsExpenseData.length) {
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 50,
+                        getTitlesWidget: (value, meta) {
+                          final formatted = compactCurrency
+                              .format(value)
+                              .replaceAll('.0', '');
                           return Text(
-                            controller.incomeVsExpenseData[value
-                                    .toInt()]['month'] ??
-                                '',
-                            style: TextStyle(fontSize: 12, color: muted),
+                            formatted,
+                            style: TextStyle(fontSize: 11, color: muted),
                           );
-                        }
-                        return const Text('');
-                      },
+                        },
+                      ),
+                    ),
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
                     ),
                   ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 50,
-                      getTitlesWidget: (value, meta) {
-                        final formatted = compactCurrency
-                            .format(value)
-                            .replaceAll('.0', '');
-                        return Text(
-                          formatted,
-                          style: TextStyle(fontSize: 11, color: muted),
-                        );
-                      },
-                    ),
-                  ),
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
+                  gridData: const FlGridData(show: false),
+                  borderData: FlBorderData(show: false),
                 ),
-                gridData: const FlGridData(show: false),
-                borderData: FlBorderData(show: false),
               ),
             ),
-          ),
         ],
       ),
     );
+  }
+
+  double _calculateMaxY(List<Map<String, dynamic>> data) {
+    final values = data
+        .expand<num>((e) => [e['income'] ?? 0, e['expense'] ?? 0])
+        .where((v) => v > 0)
+        .toList();
+    if (values.isEmpty) return 5500.0;
+    return values.reduce((a, b) => a > b ? a : b).toDouble() * 1.2;
+  }
+
+  List<BarChartGroupData> _buildBarChartGroups(
+      List<Map<String, dynamic>> data) {
+    return data.asMap().entries.map((entry) {
+      final data = entry.value;
+      return BarChartGroupData(
+        x: entry.key,
+        barRods: [
+          BarChartRodData(
+            toY: (data['income'] ?? 0).toDouble(),
+            color: const Color(0xFF14B8A6),
+            width: 12,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(4),
+              topRight: Radius.circular(4),
+            ),
+          ),
+          BarChartRodData(
+            toY: (data['expense'] ?? 0).toDouble(),
+            color: const Color(0xFFEF4444),
+            width: 12,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(4),
+              topRight: Radius.circular(4),
+            ),
+          ),
+        ],
+      );
+    }).toList();
   }
 
   Widget _buildCategoryTab() {
@@ -466,18 +541,41 @@ class StatisticPage extends GetView<StatisticController> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Budget vs Spent',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: foreground,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Budget vs Spent',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: foreground,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => _showAddCategoryDialog(context),
+                      icon: const Icon(Icons.add, size: 20, color: primary),
+                      style: IconButton.styleFrom(
+                        backgroundColor: accent,
+                        padding: const EdgeInsets.all(8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                      tooltip: 'Tambah Kategori',
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
-                ...controller.budgetVsSpent.map(
-                  (category) => _buildCategoryItem(category, context),
-                ),
+                if (controller.budgetVsSpent.isEmpty)
+                  Text(
+                    'No budget data available.',
+                    style: TextStyle(fontSize: 13, color: muted),
+                  )
+                else
+                  ...controller.budgetVsSpent.map(
+                    (category) => _buildCategoryItem(category, context),
+                  ),
               ],
             ),
           ),
@@ -508,13 +606,13 @@ class StatisticPage extends GetView<StatisticController> {
                   )
                 else
                   ...controller.topSpendingCategories.asMap().entries.map(
-                    (entry) => _buildTopCategoryItem(entry.key + 1, {
-                      'name': controller.getCategoryLabel(
-                        entry.value['category'],
+                        (entry) => _buildTopCategoryItem(entry.key + 1, {
+                          'name': _safeGetCategoryLabel(
+                            entry.value['category'],
+                          ),
+                          'value': entry.value['amount'] ?? 0,
+                        }),
                       ),
-                      'value': entry.value['amount'] ?? 0,
-                    }),
-                  ),
               ],
             ),
           ),
@@ -529,12 +627,11 @@ class StatisticPage extends GetView<StatisticController> {
   ) {
     final spent = (category['spent'] ?? 0) as int;
     final budget = (category['budget'] ?? 0) as int;
-    final percentage = budget > 0
-        ? ((spent.toDouble() / budget) * 100).round()
-        : 0;
+    final percentage =
+        budget > 0 ? ((spent.toDouble() / budget) * 100).round() : 0;
     final isOverBudget = percentage > 85;
     final isWarning = percentage > 70;
-    final categoryLabel = controller.getCategoryLabel(
+    final categoryLabel = _safeGetCategoryLabel(
       category['category'] ?? category['category_id'],
     );
 
@@ -578,11 +675,11 @@ class StatisticPage extends GetView<StatisticController> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Spent: ${currency.format(spent)}',
+                        'Spent: ${_safeFormatCurrency(spent)}',
                         style: TextStyle(fontSize: 12, color: muted),
                       ),
                       Text(
-                        'Budget: ${currency.format(budget)}',
+                        'Budget: ${_safeFormatCurrency(budget)}',
                         style: TextStyle(fontSize: 12, color: muted),
                       ),
                     ],
@@ -599,14 +696,14 @@ class StatisticPage extends GetView<StatisticController> {
                           ),
                           child: FractionallySizedBox(
                             alignment: Alignment.centerLeft,
-                            widthFactor: percentage / 100,
+                            widthFactor: (percentage / 100).clamp(0.0, 1.0),
                             child: Container(
                               decoration: BoxDecoration(
                                 color: isOverBudget
                                     ? Colors.red
                                     : isWarning
-                                    ? Colors.yellow
-                                    : primary,
+                                        ? Colors.yellow
+                                        : primary,
                                 borderRadius: BorderRadius.circular(3),
                               ),
                             ),
@@ -622,7 +719,7 @@ class StatisticPage extends GetView<StatisticController> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${currency.format(budget - spent)} remaining',
+                    '${_safeFormatCurrency(budget - spent)} remaining',
                     style: TextStyle(fontSize: 12, color: muted),
                   ),
                 ],
@@ -637,6 +734,9 @@ class StatisticPage extends GetView<StatisticController> {
   }
 
   Widget _buildTopCategoryItem(int rank, Map<String, dynamic> category) {
+    final name = category['name'] ?? 'Unknown';
+    final value = category['value'] ?? 0;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -667,12 +767,12 @@ class StatisticPage extends GetView<StatisticController> {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              category['name'],
+              name,
               style: TextStyle(fontSize: 14, color: foreground),
             ),
           ),
           Text(
-            currency.format(category['value']),
+            _safeFormatCurrency(value),
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -684,39 +784,161 @@ class StatisticPage extends GetView<StatisticController> {
     );
   }
 
-  Widget _buildFilterChip(String label, String value) {
-    final isSelected = controller.selectedJenisKategori.value == value;
-    return FilterChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (selected) {
-        if (selected) {
-          controller.changeJenisKategori(value);
-        }
+  void _showAddCategoryDialog(BuildContext context) {
+    final TextEditingController nameController = TextEditingController();
+    final RxBool isAdding = false.obs;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        final RxString deskripsiValue = 'Pengeluaran'.obs;
+
+        return Obx(() {
+          return AlertDialog(
+            backgroundColor: background,
+            title: const Text('Tambah Kategori Transaksi'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ShadInput(
+                  controller: nameController,
+                  placeholder: const Text('Nama kategori'),
+                ),
+                const SizedBox(height: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Deskripsi',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Obx(() => Padding(
+                          padding: EdgeInsets.zero,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.max,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Radio<String>(
+                                    value: 'Pengeluaran',
+                                    groupValue: deskripsiValue.value,
+                                    onChanged: (value) {
+                                      if (value != null) deskripsiValue(value);
+                                    },
+                                    activeColor: primary,
+                                    materialTapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  const Text('Pengeluaran'),
+                                ],
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.max,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Radio<String>(
+                                    value: 'Pemasukan',
+                                    groupValue: deskripsiValue.value,
+                                    onChanged: (value) {
+                                      if (value != null) deskripsiValue(value);
+                                    },
+                                    activeColor: primary,
+                                    materialTapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  const Text('Pemasukan'),
+                                ],
+                              ),
+                            ],
+                          ),
+                        )),
+                  ],
+                ),
+              ],
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed:
+                    isAdding.value ? null : () => Navigator.of(context).pop(),
+                child: const Text('Batal'),
+              ),
+              ShadButton(
+                onPressed: isAdding.value
+                    ? null
+                    : () async {
+                        final name = nameController.text.trim();
+                        if (name.isEmpty) {
+                          if (context.mounted) {
+                            ShadToaster.of(context).show(
+                              ShadToast.destructive(
+                                title: const Text('Nama kategori diperlukan'),
+                                description: const Text(
+                                    'Silakan masukkan nama kategori'),
+                              ),
+                            );
+                          }
+                          return;
+                        }
+
+                        try {
+                          isAdding(true);
+                          await homeController?.addCategory(
+                            name,
+                            deskripsi: deskripsiValue.value,
+                          );
+                          if (context.mounted) {
+                            Navigator.of(context).pop();
+                            ShadToaster.of(context).show(
+                              ShadToast(
+                                title: const Text('Berhasil'),
+                                description: Text(
+                                    'Kategori "$name" berhasil ditambahkan'),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ShadToaster.of(context).show(
+                              ShadToast.destructive(
+                                title: const Text('Gagal'),
+                                description: const Text(
+                                    'Gagal menambahkan kategori. Silakan coba lagi.'),
+                              ),
+                            );
+                          }
+                        } finally {
+                          isAdding(false);
+                        }
+                      },
+                child: isAdding.value
+                    ? const SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Tambah'),
+              ),
+            ],
+          );
+        });
       },
-      backgroundColor: isSelected ? primary.withOpacity(0.1) : accent,
-      selectedColor: primary.withOpacity(0.2),
-      checkmarkColor: primary,
-      labelStyle: TextStyle(
-        color: isSelected ? primary : foreground,
-        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: isSelected ? primary : border, width: 1),
-      ),
     );
   }
 
   void _showFilterModal(BuildContext context) {
     if (!context.mounted) return;
 
-    int localMonth = controller.selectedMonth.value; // This is correct (1-12)
+    int localMonth = controller.selectedMonth.value;
     int localYear = controller.selectedYear.value;
     String localTransactionType = controller.selectedJenisKategori.value;
 
     showDialog(
-      context: context, // Gunakan context dari builder
+      context: context,
       builder: (context) => Dialog(
         backgroundColor: background,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -731,7 +953,6 @@ class StatisticPage extends GetView<StatisticController> {
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Header
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -749,7 +970,7 @@ class StatisticPage extends GetView<StatisticController> {
                       ),
                     ],
                   ),
-                  // Date Filter
+                  const SizedBox(height: 24),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -779,10 +1000,7 @@ class StatisticPage extends GetView<StatisticController> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 24),
-
-                  // Transaction Category Filter (Jenis Transaksi)
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -830,10 +1048,7 @@ class StatisticPage extends GetView<StatisticController> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 32),
-
-                  // Action Buttons
                   Row(
                     children: [
                       Expanded(
@@ -863,12 +1078,27 @@ class StatisticPage extends GetView<StatisticController> {
                       Expanded(
                         child: ShadButton(
                           onPressed: () async {
-                            await controller.changeFilters(
-                              localMonth,
-                              localYear,
-                              localTransactionType,
-                            );
-                            Navigator.pop(dialogContext);
+                            try {
+                              await controller.changeFilters(
+                                localMonth,
+                                localYear,
+                                localTransactionType,
+                              );
+                              if (dialogContext.mounted) {
+                                Navigator.pop(dialogContext);
+                              }
+                            } catch (e) {
+                              // Handle filter change error
+                              if (dialogContext.mounted) {
+                                ShadToaster.of(dialogContext).show(
+                                  ShadToast.destructive(
+                                    title: const Text('Error'),
+                                    description: const Text(
+                                        'Failed to apply filters. Please try again.'),
+                                  ),
+                                );
+                              }
+                            }
                           },
                           child: const Text('Terapkan'),
                         ),
@@ -920,6 +1150,7 @@ class StatisticPage extends GetView<StatisticController> {
     final years = List.generate(5, (index) => currentYear - 2 + index);
     years.add(currentYearValue);
     final uniqueYears = years.toSet().toList()..sort();
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
@@ -940,37 +1171,6 @@ class StatisticPage extends GetView<StatisticController> {
           );
         }).toList(),
         onChanged: onChanged,
-      ),
-    );
-  }
-
-  Widget _buildModalFilterChipBuffered(
-    String value,
-    String label,
-    RxString bufferValue,
-  ) {
-    final bool isSelected = bufferValue.value == value;
-    return Container(
-      constraints: const BoxConstraints(minWidth: 0, maxWidth: 100),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: isSelected ? primary : background,
-        border: Border.all(color: isSelected ? primary : border),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      alignment: Alignment.center,
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 14,
-            color: isSelected ? primaryForeground : foreground,
-            fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
-          ),
-        ),
       ),
     );
   }
@@ -1004,82 +1204,6 @@ class StatisticPage extends GetView<StatisticController> {
     );
   }
 
-  Future<void> _showMonthPicker(BuildContext context) async {
-    final initialYear = controller.selectedYear.value;
-    final initialMonth = controller.selectedMonth.value;
-    int selectedYear = initialYear;
-    int selectedMonth = initialMonth;
-    final List<int> years = List.generate(15, (index) => 2018 + index);
-    final List<int> months = List.generate(12, (index) => index + 1);
-
-    await showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Pilih Bulan dan Tahun'),
-          content: StatefulBuilder(
-            builder: (ctx, setState) {
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  DropdownButton<int>(
-                    value: selectedMonth,
-                    onChanged: (value) {
-                      if (value == null) return;
-                      setState(() => selectedMonth = value);
-                    },
-                    items: months
-                        .map(
-                          (month) => DropdownMenuItem(
-                            value: month,
-                            child: Text(
-                              DateFormat(
-                                'MMMM',
-                                'id_ID',
-                              ).format(DateTime(2020, month)),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                  const SizedBox(width: 16),
-                  DropdownButton<int>(
-                    value: selectedYear,
-                    onChanged: (value) {
-                      if (value == null) return;
-                      setState(() => selectedYear = value);
-                    },
-                    items: years
-                        .map(
-                          (year) => DropdownMenuItem(
-                            value: year,
-                            child: Text(year.toString()),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ],
-              );
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Batal'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                controller.changePeriod(selectedMonth, selectedYear);
-              },
-              child: const Text('Terapkan'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   Future<void> _showBudgetDialog(
     BuildContext context, {
     Map<String, dynamic>? existingBudget,
@@ -1092,7 +1216,7 @@ class StatisticPage extends GetView<StatisticController> {
     final bool isEdit = existingBudget != null;
     final int categoryId = existingBudget?['category_id'] ?? 0;
     String categoryName = existingBudget != null
-        ? controller.getCategoryLabel(existingBudget['category'])
+        ? _safeGetCategoryLabel(existingBudget['category'])
         : '';
 
     await showDialog(
@@ -1113,8 +1237,11 @@ class StatisticPage extends GetView<StatisticController> {
                       const SizedBox(height: 16),
                       ShadInput(
                         controller: budgetController,
-                        placeholder: Text('Enter budget amount'),
+                        placeholder: const Text('Enter budget amount'),
                         keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          ThousandsFormatter(),
+                        ],
                       ),
                     ],
                   ),
@@ -1129,10 +1256,11 @@ class StatisticPage extends GetView<StatisticController> {
                       onPressed: isAddingBudget.value
                           ? null
                           : () async {
-                              final budget = int.tryParse(
-                                budgetController.text,
-                              );
-                              if (budget == null || budget <= 0) {
+                              final budgetText = budgetController.text
+                                  .replaceAll(RegExp(r'[^0-9]'), '');
+                              final budget = int.tryParse(budgetText) ?? 0;
+
+                              if (budget <= 0) {
                                 if (context.mounted) {
                                   ShadToaster.of(context).show(
                                     ShadToast.destructive(
@@ -1145,6 +1273,7 @@ class StatisticPage extends GetView<StatisticController> {
                                 }
                                 return;
                               }
+
                               try {
                                 isAddingBudget(true);
                                 await controller.addBudget(categoryId, budget);

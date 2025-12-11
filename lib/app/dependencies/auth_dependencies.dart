@@ -104,8 +104,6 @@ class AuthDependencies {
     // Auth Remote Data Source
     Get.lazyPut<AuthRemoteDataSource>(
       () => AuthRemoteDataSourceImpl(
-        dio: Get.find<Dio>(),
-        baseUrl: 'https://api.example.com', // TODO: Move to config
         logger: Get.find<Logger>(),
       ),
       fenix: true,

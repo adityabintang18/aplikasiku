@@ -4,10 +4,9 @@ import 'package:aplikasiku/app/data/services/financial_service.dart';
 import 'package:aplikasiku/app/data/models/financial_model.dart';
 import 'package:logger/logger.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:aplikasiku/app/mixins/update_handler_mixin.dart';
 import 'package:aplikasiku/app/utils/exceptions.dart';
 
-class TransactionController extends GetxController with UpdateHandlerMixin {
+class TransactionController extends GetxController {
   final FinansialService _financialService = FinansialService();
   final _logger = Logger();
 
@@ -66,8 +65,7 @@ class TransactionController extends GetxController with UpdateHandlerMixin {
           (type) => type['id'].toString() == selectedJenis,
         );
         if (selectedType != null) {
-          final selectedTypeName =
-              selectedType['nama']?.toString() ??
+          final selectedTypeName = selectedType['nama']?.toString() ??
               selectedType['name']?.toString() ??
               '';
           _logger.i('  Selected type name: "$selectedTypeName"');
@@ -147,13 +145,9 @@ class TransactionController extends GetxController with UpdateHandlerMixin {
         );
       }
     } catch (e, stackTrace) {
-      if (e is dio.DioException && e.error is AppUpdateRequiredException) {
-        handleUpdateException();
-      } else {
-        _logger.e('Error fetchTransactions', error: e, stackTrace: stackTrace);
-        transactions.clear(); // Clear transactions on error to show empty state
-        rethrow; // Re-throw to let UI handle the error
-      }
+      _logger.e('Error fetchTransactions', error: e, stackTrace: stackTrace);
+      transactions.clear(); // Clear transactions on error to show empty state
+      rethrow; // Re-throw to let UI handle the error
     } finally {
       if (showLoader) isLoading(false);
     }
@@ -173,16 +167,12 @@ class TransactionController extends GetxController with UpdateHandlerMixin {
         }
       }
     } catch (e, stackTrace) {
-      if (e is dio.DioException && e.error is AppUpdateRequiredException) {
-        handleUpdateException();
-      } else {
-        _logger.e(
-          'Error fetchTransactionTypes',
-          error: e,
-          stackTrace: stackTrace,
-        );
-        transactionTypes.clear(); // Clear on error
-      }
+      _logger.e(
+        'Error fetchTransactionTypes',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      transactionTypes.clear(); // Clear on error
     } finally {
       isTransactionTypesLoading(false);
     }
@@ -256,8 +246,7 @@ class TransactionController extends GetxController with UpdateHandlerMixin {
         (tt) => tt['id'].toString() == type,
       );
       if (selectedType != null) {
-        final typeName =
-            selectedType['nama']?.toString() ??
+        final typeName = selectedType['nama']?.toString() ??
             selectedType['name']?.toString() ??
             '';
         return t.namaJenisKategori == typeName;
@@ -320,9 +309,8 @@ class TransactionController extends GetxController with UpdateHandlerMixin {
     }
 
     final categories = categoryMap.entries.map((entry) {
-      final percentage = totalExpenses > 0
-          ? (entry.value / totalExpenses * 100).round()
-          : 0;
+      final percentage =
+          totalExpenses > 0 ? (entry.value / totalExpenses * 100).round() : 0;
       return {
         'category': entry.key,
         'amount': entry.value,

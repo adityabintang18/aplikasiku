@@ -1,9 +1,10 @@
-import 'package:dio/dio.dart';
 import 'package:logger/logger.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'base_api_service.dart';
 
 class VersionService extends BaseApiService {
   final Logger _logger = Logger();
+  static String? _cachedVersion;
 
   /// Check if app update is required
   Future<Map<String, dynamic>> checkForUpdate({
@@ -17,7 +18,7 @@ class VersionService extends BaseApiService {
       );
 
       final response = await client.get(
-        '/api/version/check',
+        '$baseUrl/api/version/check',
         queryParameters: {'platform': platform, 'version': currentVersion},
       );
 
@@ -54,20 +55,59 @@ class VersionService extends BaseApiService {
     }
   }
 
-  /// Get current app version from environment
+  /// Get current app version from pubspec.yaml (canonical source)
   Future<String> getCurrentVersion() async {
+    if (_cachedVersion != null) {
+      return _cachedVersion!;
+    }
+
     try {
-      // Use the appVersion from BaseApiService which reads from environment
-      final version = appVersion;
-      _logger.d('VersionService: Current version from env: $version');
+      final packageInfo = await PackageInfo.fromPlatform();
+      final version = '${packageInfo.version}+${packageInfo.buildNumber}';
+
+      _logger.d('VersionService: Current version from pubspec: $version');
+      _logger.d('VersionService: Version name: ${packageInfo.version}');
+      _logger.d('VersionService: Build number: ${packageInfo.buildNumber}');
+
+      _cachedVersion = version;
       return version;
     } catch (e) {
       _logger.e('VersionService: Error getting current version: $e');
-      return '1.0.0+1';
+      // Fallback to a default version
+      const fallbackVersion = '1.0.0+1';
+      _logger.w('VersionService: Using fallback version: $fallbackVersion');
+      _cachedVersion = fallbackVersion;
+      return fallbackVersion;
     }
   }
 
-  /// Parse version string
+  /// Get just the version name (without build number) for API compatibility
+  Future<String> getVersionName() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      return packageInfo.version;
+    } catch (e) {
+      _logger.e('VersionService: Error getting version name: $e');
+      return '1.0.0';
+    }
+  }
+
+  /// Get just the build number for display
+  Future<String> getBuildNumber() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      return packageInfo.buildNumber;
+    } catch (e) {
+      _logger.e('VersionService: Error getting build number: $e');
+      return '1';
+    }
+  }
+
+  /// Clear cached version (useful for testing or when version might change)
+  static void clearCachedVersion() {
+    _cachedVersion = null;
+  }
+
   static Map<String, String> parseVersion(String version) {
     final parts = version.split('+');
     return {

@@ -5,6 +5,7 @@ import 'package:logger/logger.dart';
 import 'package:aplikasiku/app/core/errors/app_exception.dart';
 import 'package:aplikasiku/app/ui/widgets/error_widget.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import 'update_handler_service.dart';
 
 /// Centralized error handling service for the application
 class ErrorHandlerService extends GetxService {
@@ -112,6 +113,40 @@ class ErrorHandlerService extends GetxService {
           statusCode: statusCode,
           responseData: responseData,
           code: 'VALIDATION_ERROR',
+          originalError: error,
+        );
+
+      case 426:
+        // Handle upgrade required - trigger update dialog
+        _logger.w('Received 426 Upgrade Required - triggering update dialog');
+
+        // Extract URLs from response data
+        String? updateUrl;
+        String? apkUrl;
+
+        if (responseData is Map<String, dynamic>) {
+          updateUrl = responseData['storeUrl'] ??
+              responseData['update_url'] ??
+              responseData['store_url'];
+          apkUrl = responseData['apkUrl']; // Direct APK download URL
+
+          _logger.i(
+              'ErrorHandlerService: Extracted from API - updateUrl: $updateUrl, apkUrl: $apkUrl');
+        }
+
+        UpdateHandlerService.handleUpdateRequired(
+          dioException: error,
+          customMessage: responseData is Map<String, dynamic>
+              ? responseData['message']
+              : 'A new version of the app is available. Please update to continue.',
+          updateUrl: updateUrl,
+          apkUrl: apkUrl,
+        );
+        return ApiException(
+          'App update required',
+          statusCode: statusCode,
+          responseData: responseData,
+          code: 'UPGRADE_REQUIRED',
           originalError: error,
         );
 
@@ -246,6 +281,8 @@ class ErrorHandlerService extends GetxService {
             return 'You do not have permission to perform this action.';
           case 404:
             return 'The requested resource was not found.';
+          case 426:
+            return 'App update required. Please update to continue.';
           case 500:
             return 'Server is temporarily unavailable. Please try again later.';
           default:
@@ -280,6 +317,16 @@ class ErrorHandlerService extends GetxService {
         exception = error;
       } else {
         exception = AppExceptionUnknown(error.toString(), originalError: error);
+      }
+
+      // SPECIAL HANDLING: Don't catch upgrade required errors
+      // Let them propagate so controllers can handle them properly
+      if (exception is ApiException && exception.code == 'UPGRADE_REQUIRED') {
+        _logger.w(
+            'ErrorHandlerService: UPGRADE_REQUIRED exception detected, re-throwing to trigger dialog');
+        // Update dialog is already shown by UpdateHandlerService
+        // Re-throw the exception so it can be caught by controller if needed
+        rethrow;
       }
 
       if (showDialog) {

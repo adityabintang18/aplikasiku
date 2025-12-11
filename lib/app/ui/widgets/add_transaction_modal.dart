@@ -4,6 +4,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:aplikasiku/app/controllers/transaction_controller.dart';
 import 'package:aplikasiku/app/controllers/home_controller.dart';
 import 'package:aplikasiku/app/data/models/financial_model.dart';
+import 'package:aplikasiku/app/utils/helpers.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 
@@ -45,8 +46,7 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
         if (filteredCategories.isNotEmpty) {
           setState(() {
             _selectedCategoryId = filteredCategories.first['id'] as int;
-            _selectedCategory =
-                filteredCategories.first['nama'] ??
+            _selectedCategory = filteredCategories.first['nama'] ??
                 filteredCategories.first['name'] ??
                 '';
           });
@@ -106,7 +106,8 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
       try {
         final values = formKey.currentState!.value;
 
-        final amount = double.parse(values['amount']?.toString() ?? '0');
+        final amount =
+            parseFormattedAmount(values['amount']?.toString() ?? '0');
         final title = _noteController.text.isEmpty
             ? _selectedCategory ?? 'Transaction'
             : _noteController.text;
@@ -263,8 +264,8 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                                         filteredCategories.first['id'] as int;
                                     _selectedCategory =
                                         filteredCategories.first['nama'] ??
-                                        filteredCategories.first['name'] ??
-                                        '';
+                                            filteredCategories.first['name'] ??
+                                            '';
                                   });
                                 }
                               });
@@ -316,8 +317,8 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                                         filteredCategories.first['id'] as int;
                                     _selectedCategory =
                                         filteredCategories.first['nama'] ??
-                                        filteredCategories.first['name'] ??
-                                        '';
+                                            filteredCategories.first['name'] ??
+                                            '';
                                   });
                                 }
                               });
@@ -365,11 +366,11 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                       physics: const NeverScrollableScrollPhysics(),
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 4,
-                            crossAxisSpacing: 6,
-                            mainAxisSpacing: 6,
-                            childAspectRatio: 1,
-                          ),
+                        crossAxisCount: 4,
+                        crossAxisSpacing: 6,
+                        mainAxisSpacing: 6,
+                        childAspectRatio: 1,
+                      ),
                       itemCount: _homeController.transactionTypes.length,
                       itemBuilder: (context, index) {
                         final txType = _homeController.transactionTypes[index];
@@ -461,6 +462,9 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                     id: 'amount',
                     controller: _amountController,
                     keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      ThousandsFormatter(), // ← This enables auto formatting
+                    ],
                     label: const Text(
                       "Amount",
                       style: TextStyle(fontWeight: FontWeight.bold),
@@ -471,16 +475,13 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                       if (value.isEmpty) {
                         return 'Amount is required';
                       }
-                      if (double.tryParse(value) == null) {
-                        return 'Please enter a valid amount';
-                      }
-                      if (double.parse(value) <= 0) {
-                        return 'Amount must be greater than 0';
+                      final parsedAmount = parseFormattedAmount(value);
+                      if (parsedAmount <= 0) {
+                        return 'Please enter a valid amount greater than 0';
                       }
                       return null;
                     },
                   ),
-
                   const SizedBox(height: 15),
                   ShadSelectFormField<String>(
                     id: 'category',
@@ -517,11 +518,11 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                       if (value != null) {
                         setState(() {
                           _selectedCategoryId = int.parse(value);
-                          final selectedCat = _getFilteredCategories()
-                              .firstWhere(
-                                (cat) => cat['id'].toString() == value,
-                                orElse: () => {},
-                              );
+                          final selectedCat =
+                              _getFilteredCategories().firstWhere(
+                            (cat) => cat['id'].toString() == value,
+                            orElse: () => {},
+                          );
                           _selectedCategory =
                               selectedCat['nama'] ?? selectedCat['name'] ?? '';
                         });
@@ -609,7 +610,6 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                     placeholder: const Text("Add a note..."),
                     maxLines: 3,
                   ),
-
                   const SizedBox(height: 30),
                   Row(
                     children: [

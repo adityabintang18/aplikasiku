@@ -15,7 +15,7 @@ class AuthController extends GetxController {
   /// 🔐 Login user
   Future<Map<String, dynamic>> login(String email, String password) async {
     _logger.i('AuthController: Attempting login for email: $email');
-    final response = await _authService.login(email, password);
+    final response = await _authService.loginLegacy(email, password);
     if (response['success'] == true) {
       isLoggedIn.value = true;
       _logger.i('AuthController: Login successful');
@@ -52,7 +52,7 @@ class AuthController extends GetxController {
     String password_confirmation,
   ) async {
     _logger.i('AuthController: Attempting registration for email: $email');
-    return await _authService.register(
+    return await _authService.registerLegacy(
       name,
       email,
       password,
@@ -192,7 +192,7 @@ class AuthController extends GetxController {
         );
 
         // Login with token
-        final response = await _authService.loginWithToken(refreshToken);
+        final response = await _authService.loginWithTokenLegacy(refreshToken);
         _logger.i(
           'AuthController: Server login with token response: success=${response['success']}',
         );
@@ -247,8 +247,7 @@ class AuthController extends GetxController {
   Future<bool> isBiometricAvailable() async {
     _logger.d('AuthController: Checking biometric availability (simple)');
     try {
-      final result =
-          await _localAuth.canCheckBiometrics ||
+      final result = await _localAuth.canCheckBiometrics ||
           await _localAuth.isDeviceSupported();
       _logger.d('AuthController: Simple biometric check result: $result');
       return result;
@@ -409,7 +408,7 @@ class AuthController extends GetxController {
   /// 🔑 Forgot password - request reset token
   Future<Map<String, dynamic>?> forgotPassword(String email) async {
     _logger.i('AuthController: Requesting password reset for email: $email');
-    return await _authService.forgotPassword(email);
+    return await _authService.forgotPasswordLegacy(email);
   }
 
   /// 🔓 Reset password using token
@@ -420,7 +419,7 @@ class AuthController extends GetxController {
     String passwordConfirmation,
   ) async {
     _logger.i('AuthController: Attempting password reset for email: $email');
-    return await _authService.resetPassword(
+    return await _authService.resetPasswordLegacy(
       email,
       token,
       password,

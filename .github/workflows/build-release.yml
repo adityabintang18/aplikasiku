@@ -50,7 +50,7 @@ jobs:
         
         echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_OUTPUT
         echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_OUTPUT
-        echo "APK_NAME=app-$VERSION_NAME-$BUILD_NUMBER.apk" >> $GITHUB_OUTPUT
+        echo "APK_NAME=aplikasiku-$VERSION_NAME-$BUILD_NUMBER.apk" >> $GITHUB_OUTPUT
         echo "TAG_NAME=v$VERSION_NAME+$BUILD_NUMBER" >> $GITHUB_OUTPUT
         echo "Download URL: https://github.com/${{ github.repository }}/releases/download/v$VERSION_NAME+$BUILD_NUMBER/app-$VERSION_NAME-$BUILD_NUMBER.apk"
         

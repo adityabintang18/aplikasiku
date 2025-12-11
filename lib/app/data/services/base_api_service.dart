@@ -2,23 +2,62 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:logger/logger.dart';
-import 'package:aplikasiku/app/utils/exceptions.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 abstract class BaseApiService {
   final Dio client = Dio();
   final storage = const FlutterSecureStorage();
   final logger = Logger();
 
-  String get baseUrl => dotenv.env['API_BASE_URL'] ?? 'https://api.example.com';
-
-  String get appVersion {
-    final version = dotenv.env['APP_VERSION'] ?? '1.0.0';
-    // Basic validation: should match x.y.z format
-    final regex = RegExp(r'^\d+\.\d+\.\d+$');
-    if (!regex.hasMatch(version)) {
-      throw Exception('Invalid APP_VERSION format: $version. Expected x.y.z');
+  String get baseUrl {
+    final url = dotenv.env['API_BASE_URL'];
+    if (url == null || url.isEmpty) {
+      logger.e('API_BASE_URL not found in environment variables');
+      logger.i('Available env vars: ${dotenv.env.keys.toList()}');
+      throw Exception('API_BASE_URL environment variable is required');
     }
-    return version;
+
+    // Ensure URL doesn't end with slash
+    final cleanUrl = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+    logger.i('Using API base URL: $cleanUrl');
+    return cleanUrl;
+  }
+
+  /// Get app version from package_info_plus (canonical source)
+  Future<String> get appVersion async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      final version = packageInfo.version;
+
+      // Validate version format
+      final regex = RegExp(r'^\d+\.\d+\.\d+$');
+      if (!regex.hasMatch(version)) {
+        logger.w(
+            'BaseApiService: Invalid version format from package_info: $version, using env fallback');
+        final envVersion = dotenv.env['APP_VERSION'] ?? '1.0.0';
+        return envVersion;
+      }
+
+      logger.d(
+          'BaseApiService: Using app version from package_info_plus: $version');
+      return version;
+    } catch (e) {
+      logger.w(
+          'BaseApiService: package_info_plus not available: $e, using env fallback');
+
+      // Fallback to env variable
+      final envVersion = dotenv.env['APP_VERSION'];
+      if (envVersion != null && envVersion.isNotEmpty) {
+        logger
+            .d('BaseApiService: Using fallback version from env: $envVersion');
+        return envVersion;
+      }
+
+      // Final fallback to default version
+      const defaultVersion = '1.0.0';
+      logger.w('BaseApiService: Using default version: $defaultVersion');
+      return defaultVersion;
+    }
   }
 
   BaseApiService() {
@@ -29,11 +68,14 @@ abstract class BaseApiService {
     client.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          // Add X-App-Version header
-          options.headers['X-App-Version'] = appVersion;
-          logger.i('Sending X-App-Version header: $appVersion');
+          try {
+            final currentVersion = await appVersion;
+            options.headers['X-App-Version'] = currentVersion;
+            logger.i('Sending X-App-Version header: $currentVersion');
+          } catch (e) {
+            logger.w('Could not get app version for header: $e');
+          }
 
-          // Add Authorization header if token exists and not already set
           if (!options.headers.containsKey('Authorization')) {
             final token = await getToken();
             if (token != null) {
@@ -50,11 +92,8 @@ abstract class BaseApiService {
           logger.e(
             'DioException: ${e.message}, status: ${e.response?.statusCode}, url: ${e.requestOptions.uri}',
           );
-          // Handle 426 Upgrade Required
-          if (e.response?.statusCode == 426) {
-            logger.w('Received 426 Upgrade Required, throwing exception');
-            throw AppUpdateRequiredException('App update required');
-          }
+          // Don't handle 426 here - let it propagate to ErrorHandlerService
+          // ErrorHandlerService will handle it and trigger the update dialog
           handler.next(e);
         },
       ),

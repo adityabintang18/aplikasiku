@@ -11,7 +11,6 @@ import 'package:aplikasiku/app/ui/pages/home_page.dart';
 import 'package:aplikasiku/app/ui/pages/statistic_page.dart';
 import 'package:aplikasiku/app/ui/pages/profile_page.dart';
 import 'package:aplikasiku/app/ui/pages/transaction_detail_page.dart';
-import 'package:aplikasiku/app/ui/pages/update_required_page.dart';
 import 'package:aplikasiku/app/ui/pages/splash_page.dart';
 import 'package:aplikasiku/app/data/models/financial_model.dart';
 
@@ -60,10 +59,9 @@ GoRouter _createRouter() {
         final loggedIn = authC!.isLoggedIn.value;
         final loggingIn = state.matchedLocation == '/login';
         final registering = state.matchedLocation == '/register';
-        final updating = state.matchedLocation == '/update-required';
         final splashing = state.matchedLocation == '/splash';
 
-        if (!loggedIn && !loggingIn && !registering && !updating && !splashing)
+        if (!loggedIn && !loggingIn && !registering && !splashing)
           return '/login';
         if (loggedIn && (loggingIn || registering)) return '/';
         return null;
@@ -74,14 +72,13 @@ GoRouter _createRouter() {
     },
     routes: [
       StatefulShellRoute.indexedStack(
-        builder:
-            (
-              BuildContext context,
-              GoRouterState state,
-              StatefulNavigationShell navigationShell,
-            ) {
-              return MainPage(navigationShell: navigationShell);
-            },
+        builder: (
+          BuildContext context,
+          GoRouterState state,
+          StatefulNavigationShell navigationShell,
+        ) {
+          return MainPage(navigationShell: navigationShell);
+        },
         branches: [
           StatefulShellBranch(
             routes: [
@@ -136,10 +133,6 @@ GoRouter _createRouter() {
       ),
       GoRoute(path: '/login', builder: (context, state) => LoginPage()),
       GoRoute(path: '/register', builder: (context, state) => RegisterPage()),
-      GoRoute(
-        path: '/update-required',
-        builder: (context, state) => UpdateRequiredPage(),
-      ),
       GoRoute(path: '/splash', builder: (context, state) => SplashPage()),
     ],
   );
