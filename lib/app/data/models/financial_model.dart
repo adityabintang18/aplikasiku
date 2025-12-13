@@ -9,6 +9,7 @@ class FinansialModel {
   final String? photoUrl;
   final String namaKategori;
   final String namaJenisKategori;
+  final String? effectiveMonth;
 
   FinansialModel({
     required this.id,
@@ -21,6 +22,7 @@ class FinansialModel {
     this.photoUrl,
     required this.namaKategori,
     required this.namaJenisKategori,
+    this.effectiveMonth,
   });
 
   factory FinansialModel.fromJson(Map<String, dynamic> json) {
@@ -35,7 +37,7 @@ class FinansialModel {
       isIncome: (json['is_income'] is bool)
           ? json['is_income'] as bool
           : (json['is_income']?.toString() == '1' ||
-                json['is_income']?.toString().toLowerCase() == 'true'),
+              json['is_income']?.toString().toLowerCase() == 'true'),
       date: json['date']?.toString() ?? '',
       amount: json['amount'] is num
           ? (json['amount'] as num).toDouble()
@@ -44,6 +46,7 @@ class FinansialModel {
       photoUrl: json['photo_url']?.toString(),
       namaKategori: json['nama_kategori']?.toString() ?? '',
       namaJenisKategori: json['nama_jenis_kategori']?.toString() ?? '',
+      effectiveMonth: json['effective_month']?.toString(),
     );
   }
 }

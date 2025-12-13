@@ -8,12 +8,14 @@ import 'package:aplikasiku/app/controllers/profile_controller.dart';
 import 'package:aplikasiku/app/controllers/auth_controller.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/loading_widget.dart';
+import '../../data/services/version_service.dart';
 // import '../widgets/error_widget.dart';
 // import '../widgets/error_boundary.dart';
 // import '../../core/errors/app_exception.dart';
 
 class ProfilePage extends GetView<ProfileController> {
   final logger = Logger();
+  final VersionService _versionService = VersionService();
 
   AuthController get authController => Get.find<AuthController>();
 
@@ -26,15 +28,28 @@ class ProfilePage extends GetView<ProfileController> {
   static const Color primary = Color(0xFF0F172A);
   static const Color primaryForeground = Color(0xFFFFFFFF);
 
-  late final BuildContext context;
+  String? _appVersion; // Store version
+  bool _hasLoadedVersion = false;
 
   @override
-  Widget build(BuildContext buildContext) {
-    context = buildContext;
+  Widget build(BuildContext context) {
     // Call onPageEnter when page is built (refreshes data every time page is entered)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.onPageEnter();
     });
+
+    // Load version if not loaded yet
+    if (!_hasLoadedVersion) {
+      _hasLoadedVersion = true;
+      _versionService.getCurrentVersion().then((value) {
+        _appVersion = value;
+        if (context.mounted) {
+          // Update UI
+          // ignore: invalid_use_of_protected_member
+          (context as Element).markNeedsBuild();
+        }
+      });
+    }
 
     return SafeArea(
       child: Obx(() {
@@ -89,7 +104,7 @@ class ProfilePage extends GetView<ProfileController> {
                           backgroundImage: userInfo['photo_url'] != null
                               ? NetworkImage(userInfo['photo_url'])
                               : const AssetImage('assets/avatar.png')
-                                    as ImageProvider,
+                                  as ImageProvider,
                           child: userInfo['photo_url'] == null
                               ? Text(
                                   _getInitials(userName),
@@ -123,7 +138,7 @@ class ProfilePage extends GetView<ProfileController> {
                         ),
                       ),
                       IconButton(
-                        onPressed: () => _showEditProfileDialog(),
+                        onPressed: () => _showEditProfileDialog(context),
                         icon: Icon(Icons.edit_outlined, color: muted),
                         style: IconButton.styleFrom(
                           backgroundColor: accent,
@@ -176,7 +191,7 @@ class ProfilePage extends GetView<ProfileController> {
                     subtitle: "Update your password",
                     iconBgColor: accent,
                     iconColor: foreground,
-                    onTap: () => _showChangePasswordDialog(),
+                    onTap: () => _showChangePasswordDialog(context),
                   ),
                   // _buildMenuItem(
                   //   icon: Icons.shield,
@@ -186,7 +201,7 @@ class ProfilePage extends GetView<ProfileController> {
                   //   iconColor: foreground,
                   //   onTap: () {},
                   // ),
-                  _buildBiometricItem(),
+                  _buildBiometricItem(context),
                 ]),
                 const SizedBox(height: 16),
                 _buildSettingsSection('OTHER', [
@@ -196,12 +211,12 @@ class ProfilePage extends GetView<ProfileController> {
                     subtitle: "Get help with Aplikasiku",
                     iconBgColor: accent,
                     iconColor: foreground,
-                    onTap: _openWhatsApp,
+                    onTap: () => _openWhatsApp(context),
                   ),
                   _buildMenuItem(
                     icon: Icons.info,
                     title: "About",
-                    subtitle: "Version 1.0.0",
+                    subtitle: "Version ${_appVersion ?? '...'}",
                     iconBgColor: accent,
                     iconColor: foreground,
                     onTap: () {},
@@ -322,7 +337,7 @@ class ProfilePage extends GetView<ProfileController> {
     );
   }
 
-  Widget _buildBiometricItem() {
+  Widget _buildBiometricItem(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
@@ -417,7 +432,7 @@ class ProfilePage extends GetView<ProfileController> {
     );
   }
 
-  void _showChangePasswordDialog() {
+  void _showChangePasswordDialog(BuildContext context) {
     final formKey = GlobalKey<ShadFormState>();
     final oldPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
@@ -578,7 +593,7 @@ class ProfilePage extends GetView<ProfileController> {
     );
   }
 
-  void _showEditProfileDialog() {
+  void _showEditProfileDialog(BuildContext context) {
     final formKey = GlobalKey<ShadFormState>();
     final nameController = TextEditingController(
       text: controller.userInfo['name'] ?? '',
@@ -644,13 +659,12 @@ class ProfilePage extends GetView<ProfileController> {
                           backgroundImage: selectedImage != null
                               ? FileImage(File(selectedImage!.path))
                               : (controller.userInfo['photo_url'] != null
-                                    ? NetworkImage(
-                                        controller.userInfo['photo_url'],
-                                      )
-                                    : const AssetImage('assets/avatar.png')
-                                          as ImageProvider),
-                          child:
-                              selectedImage == null &&
+                                  ? NetworkImage(
+                                      controller.userInfo['photo_url'],
+                                    )
+                                  : const AssetImage('assets/avatar.png')
+                                      as ImageProvider),
+                          child: selectedImage == null &&
                                   controller.userInfo['photo_url'] == null
                               ? const Icon(
                                   Icons.camera_alt,
@@ -733,7 +747,7 @@ class ProfilePage extends GetView<ProfileController> {
     );
   }
 
-  void _openWhatsApp() async {
+  void _openWhatsApp(BuildContext context) async {
     const phone = '6282290639529';
     final url = 'https://wa.me/$phone';
     final uri = Uri.parse(url);

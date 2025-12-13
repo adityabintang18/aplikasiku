@@ -61,6 +61,11 @@ class TransactionPage extends GetView<TransactionController> {
   Widget build(BuildContext context) {
     logger.i('TransactionPage build called');
 
+    // Auto trigger data loading when page is opened
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.onPageEnter();
+    });
+
     return SafeArea(
       child: ErrorBoundary(
         onError: (context, error, stack) => AppErrorWidget(
@@ -189,9 +194,8 @@ class TransactionPage extends GetView<TransactionController> {
           child: Obx(() {
             final isTypesLoading = controller.isTransactionTypesLoading.value;
             return IconButton(
-              onPressed: isTypesLoading
-                  ? null
-                  : () => _showFilterModal(context),
+              onPressed:
+                  isTypesLoading ? null : () => _showFilterModal(context),
               icon: isTypesLoading
                   ? const SizedBox(
                       width: 16,

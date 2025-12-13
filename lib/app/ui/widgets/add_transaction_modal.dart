@@ -30,6 +30,7 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
   XFile? _selectedImage;
   final ImagePicker _imagePicker = ImagePicker();
   bool _isLoading = false;
+  bool _useNextMonth = false;
 
   @override
   void initState() {
@@ -56,6 +57,132 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
   }
 
   Future<void> _pickImage() async {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Choose Image Source',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.pop(context);
+                      _pickFromCamera();
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.camera_alt,
+                            color: Colors.blue.shade600,
+                            size: 32,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Camera',
+                            style: TextStyle(
+                              color: Colors.blue.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.pop(context);
+                      _pickFromGallery();
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.green.shade200),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.photo_library,
+                            color: Colors.green.shade600,
+                            size: 32,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Gallery',
+                            style: TextStyle(
+                              color: Colors.green.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickFromCamera() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+      if (image != null) {
+        setState(() {
+          _selectedImage = image;
+        });
+      } else {
+        // User canceled camera
+        print('Camera was canceled by user');
+      }
+    } catch (e) {
+      print('Error taking photo: $e');
+      _showImageError(e);
+    }
+  }
+
+  Future<void> _pickFromGallery() async {
     try {
       final XFile? image = await _imagePicker.pickImage(
         source: ImageSource.gallery,
@@ -68,34 +195,38 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
           _selectedImage = image;
         });
       } else {
-        // User canceled image picker
-        print('Image picker was canceled by user');
+        // User canceled gallery picker
+        print('Gallery picker was canceled by user');
       }
     } catch (e) {
-      print('Error picking image: $e');
-      if (context.mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 24.0,
-              vertical: 16.0,
-            ),
-            child: ShadDialog.alert(
-              title: const Text('Error'),
-              description: Text(
-                'Failed to pick image.\nError: ${e.runtimeType}: ${e.toString()}',
-              ),
-              actions: [
-                ShadButton(
-                  child: const Text('OK'),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
+      print('Error picking image from gallery: $e');
+      _showImageError(e);
+    }
+  }
+
+  void _showImageError(dynamic e) {
+    if (context.mounted) {
+      showDialog(
+        context: context,
+        builder: (context) => Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 24.0,
+            vertical: 16.0,
           ),
-        );
-      }
+          child: ShadDialog.alert(
+            title: const Text('Error'),
+            description: Text(
+              'Failed to pick image.\nError: ${e.runtimeType}: ${e.toString()}',
+            ),
+            actions: [
+              ShadButton(
+                child: const Text('OK'),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+        ),
+      );
     }
   }
 
@@ -112,6 +243,18 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
             ? _selectedCategory ?? 'Transaction'
             : _noteController.text;
 
+        // Calculate effective_month based on switch
+        String? effectiveMonth;
+        if (_useNextMonth) {
+          final nextMonth = DateTime(
+            _selectedDate.year,
+            _selectedDate.month + 1,
+            1,
+          );
+          effectiveMonth =
+              '${nextMonth.year}-${nextMonth.month.toString().padLeft(2, '0')}-01';
+        }
+
         final newTransaction = FinansialModel(
           id: DateTime.now().millisecondsSinceEpoch, // Temporary ID
           title: title,
@@ -122,6 +265,7 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
           description: _noteController.text,
           namaKategori: _selectedCategory ?? 'Transaction',
           namaJenisKategori: _selectedTransactionType?.toString() ?? "personal",
+          effectiveMonth: effectiveMonth,
         );
 
         await _transactionController.addTransaction(
@@ -254,6 +398,8 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                               // Reset category selection when switching type
                               _selectedCategoryId = null;
                               _selectedCategory = null;
+                              // Reset the next month switch when switching to expense
+                              _useNextMonth = false;
                               // Set default category for expense after state update
                               WidgetsBinding.instance.addPostFrameCallback((_) {
                                 final filteredCategories =
@@ -458,6 +604,59 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                     },
                   ),
                   const SizedBox(height: 15),
+                  // Hitung ke Bulan Depan Switch - Only show for income
+                  if (_type == "income") ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.calendar_month,
+                                color: Colors.blue.shade600,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  "Hitung sebagai pemasukan bulan depan",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.blue.shade700,
+                                  ),
+                                ),
+                              ),
+                              Switch(
+                                value: _useNextMonth,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _useNextMonth = value;
+                                  });
+                                },
+                                activeColor: Colors.blue.shade600,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            "Pemasukan ini tetap dicatat hari ini, tapi masuk laporan bulan depan",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.blue.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                  ],
                   ShadInputFormField(
                     id: 'amount',
                     controller: _amountController,

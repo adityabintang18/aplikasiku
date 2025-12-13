@@ -123,9 +123,8 @@ class TransactionDetailPage extends GetView<TransactionController> {
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: transaction.isIncome
-                              ? Colors.green
-                              : Colors.red,
+                          color:
+                              transaction.isIncome ? Colors.green : Colors.red,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -242,27 +241,27 @@ class TransactionDetailPage extends GetView<TransactionController> {
                             },
                             errorBuilder: (context, error, stackTrace) =>
                                 Container(
-                                  height: 200,
-                                  color: accent,
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.error_outline,
-                                        color: muted,
-                                        size: 48,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'Failed to load image',
-                                        style: TextStyle(
-                                          color: muted,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ],
+                              height: 200,
+                              color: accent,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.error_outline,
+                                    color: muted,
+                                    size: 48,
                                   ),
-                                ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Failed to load image',
+                                    style: TextStyle(
+                                      color: muted,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -320,51 +319,98 @@ class TransactionDetailPage extends GetView<TransactionController> {
   ) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.85),
-      builder: (_) {
-        return GestureDetector(
-          onTap: () => Navigator.of(context).pop(),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            color: Colors.transparent,
-            child: Center(
-              child: Hero(
-                tag: heroTag,
-                child: InteractiveViewer(
-                  maxScale: 4,
-                  child: Image.network(
-                    imageUrl,
-                    fit: BoxFit.contain,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return const Center(
-                        child: AppLoadingWidget(
-                          message: 'Loading image...',
-                          type: LoadingType.circular,
-                        ),
-                      );
+      barrierColor: Colors.black.withOpacity(0.95),
+      builder: (dialogContext) {
+        return Scaffold(
+          backgroundColor: Colors.transparent,
+          body: SafeArea(
+            child: Stack(
+              children: [
+                // Main content area
+                Positioned.fill(
+                  child: GestureDetector(
+                    onTap: () {
+                      if (dialogContext.mounted) {
+                        Navigator.of(dialogContext).pop();
+                      }
                     },
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.error_outline, color: muted, size: 48),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Failed to load image',
-                            style: TextStyle(color: muted, fontSize: 14),
+                    child: Container(
+                      color: Colors.transparent,
+                      child: Center(
+                        child: Hero(
+                          tag: heroTag,
+                          child: InteractiveViewer(
+                            maxScale: 4,
+                            child: Image.network(
+                              imageUrl,
+                              fit: BoxFit.contain,
+                              loadingBuilder:
+                                  (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return const Center(
+                                  child: AppLoadingWidget(
+                                    message: 'Loading image...',
+                                    type: LoadingType.circular,
+                                  ),
+                                );
+                              },
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Container(
+                                padding: const EdgeInsets.all(24),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.error_outline,
+                                        color: muted, size: 48),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'Failed to load image',
+                                      style:
+                                          TextStyle(color: muted, fontSize: 14),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
+                // Close button in top-left corner
+                Positioned(
+                  top: 20,
+                  left: 20,
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.black87,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      onPressed: () {
+                        if (dialogContext.mounted) {
+                          Navigator.of(dialogContext).pop();
+                        }
+                      },
+                      icon: const Icon(
+                        Icons.arrow_back,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                      padding: const EdgeInsets.all(12),
+                      constraints: const BoxConstraints(
+                        minWidth: 48,
+                        minHeight: 48,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         );

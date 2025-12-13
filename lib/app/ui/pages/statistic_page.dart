@@ -47,6 +47,11 @@ class StatisticPage extends GetView<StatisticController> {
 
   @override
   Widget build(BuildContext context) {
+    // Auto trigger data loading when page is opened
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.onPageEnter();
+    });
+
     return SafeArea(
       child: Obx(() {
         if (controller.isLoading.value) {
@@ -91,44 +96,51 @@ class StatisticPage extends GetView<StatisticController> {
   }
 
   Widget _buildFilterSection() {
-    return GestureDetector(
-      onTap: () {
-        if (Get.context != null) {
-          _showFilterModal(Get.context!);
-        }
+    return Builder(
+      builder: (context) {
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              debugPrint('Filter section tapped!');
+              _showFilterModal(context);
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+              decoration: BoxDecoration(
+                color: background,
+                border: Border.all(color: border),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.filter_list_rounded,
+                    color: primary,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Obx(() {
+                      return _buildFilterText();
+                    }),
+                  ),
+                  Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: muted,
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
       },
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 12,
-        ),
-        decoration: BoxDecoration(
-          color: background,
-          border: Border.all(color: border),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.filter_list_rounded,
-              color: primary,
-              size: 18,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Obx(() {
-                return _buildFilterText();
-              }),
-            ),
-            Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: muted,
-              size: 20,
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -428,14 +440,30 @@ class StatisticPage extends GetView<StatisticController> {
             )
           else
             SizedBox(
-              height: 200,
+              height: 280, // Increased height for better spacing
               child: BarChart(
                 BarChartData(
                   barTouchData: BarTouchData(
                     enabled: true,
-                    touchTooltipData: BarTouchTooltipData(),
+                    touchTooltipData: BarTouchTooltipData(
+                      getTooltipColor: (_) => background,
+                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                        final item = data[group.x.toInt()];
+                        final isIncome = rodIndex == 0;
+                        return BarTooltipItem(
+                          '${isIncome ? "Income" : "Expense"}: ${_safeFormatCurrency(rod.toY.round())}',
+                          TextStyle(
+                            color: isIncome
+                                ? const Color(0xFF14B8A6)
+                                : const Color(0xFFEF4444),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                  alignment: BarChartAlignment.spaceAround,
+                  alignment: BarChartAlignment.spaceEvenly,
                   maxY: _calculateMaxY(data),
                   barGroups: _buildBarChartGroups(data),
                   titlesData: FlTitlesData(
@@ -443,12 +471,17 @@ class StatisticPage extends GetView<StatisticController> {
                     bottomTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
+                        reservedSize: 30,
                         getTitlesWidget: (value, meta) {
                           final index = value.toInt();
                           if (index < data.length) {
-                            return Text(
-                              data[index]['month'] ?? '',
-                              style: TextStyle(fontSize: 12, color: muted),
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                data[index]['month'] ?? '',
+                                style: TextStyle(fontSize: 10, color: muted),
+                                textAlign: TextAlign.center,
+                              ),
                             );
                           }
                           return const Text('');
@@ -458,14 +491,18 @@ class StatisticPage extends GetView<StatisticController> {
                     leftTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        reservedSize: 50,
+                        reservedSize: 70, // Increased reserved space
+                        interval: _calculateYAxisInterval(data),
                         getTitlesWidget: (value, meta) {
-                          final formatted = compactCurrency
-                              .format(value)
-                              .replaceAll('.0', '');
-                          return Text(
-                            formatted,
-                            style: TextStyle(fontSize: 11, color: muted),
+                          if (value == 0) return const Text('');
+                          final formatted = _formatCompactCurrency(value);
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: Text(
+                              formatted,
+                              style: TextStyle(fontSize: 9, color: muted),
+                              textAlign: TextAlign.right,
+                            ),
                           );
                         },
                       ),
@@ -477,8 +514,20 @@ class StatisticPage extends GetView<StatisticController> {
                       sideTitles: SideTitles(showTitles: false),
                     ),
                   ),
-                  gridData: const FlGridData(show: false),
-                  borderData: FlBorderData(show: false),
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval: _calculateYAxisInterval(data),
+                    getDrawingHorizontalLine: (value) => FlLine(
+                      color: border.withOpacity(0.3),
+                      strokeWidth: 0.5,
+                    ),
+                  ),
+                  borderData: FlBorderData(
+                    show: true,
+                    border:
+                        Border.all(color: border.withOpacity(0.5), width: 0.5),
+                  ),
                 ),
               ),
             ),
@@ -492,33 +541,69 @@ class StatisticPage extends GetView<StatisticController> {
         .expand<num>((e) => [e['income'] ?? 0, e['expense'] ?? 0])
         .where((v) => v > 0)
         .toList();
-    if (values.isEmpty) return 5500.0;
-    return values.reduce((a, b) => a > b ? a : b).toDouble() * 1.2;
+    if (values.isEmpty) return 5000000.0; // 5M default
+    final maxValue = values.reduce((a, b) => a > b ? a : b).toDouble();
+    // Round up to nearest nice number
+    final roundedMax = _roundUpToNiceNumber(maxValue * 1.15);
+    return roundedMax;
+  }
+
+  double _calculateYAxisInterval(List<Map<String, dynamic>> data) {
+    final maxY = _calculateMaxY(data);
+    // Create 4-5 intervals for Y-axis
+    return maxY / 4;
+  }
+
+  double _roundUpToNiceNumber(double value) {
+    if (value <= 1000000) {
+      return (value / 100000).round() * 100000.0;
+    } else if (value <= 10000000) {
+      return (value / 1000000).round() * 1000000.0;
+    } else {
+      return (value / 10000000).round() * 10000000.0;
+    }
+  }
+
+  String _formatCompactCurrency(dynamic value) {
+    try {
+      final numValue = value.toDouble();
+      if (numValue >= 1000000000) {
+        return '${(numValue / 1000000000).toStringAsFixed(1)}B';
+      } else if (numValue >= 1000000) {
+        return '${(numValue / 1000000).toStringAsFixed(1)}M';
+      } else if (numValue >= 1000) {
+        return '${(numValue / 1000).toStringAsFixed(0)}K';
+      } else {
+        return numValue.toStringAsFixed(0);
+      }
+    } catch (e) {
+      return '0';
+    }
   }
 
   List<BarChartGroupData> _buildBarChartGroups(
       List<Map<String, dynamic>> data) {
     return data.asMap().entries.map((entry) {
-      final data = entry.value;
+      final chartData = entry.value;
       return BarChartGroupData(
         x: entry.key,
         barRods: [
           BarChartRodData(
-            toY: (data['income'] ?? 0).toDouble(),
+            toY: (chartData['income'] ?? 0).toDouble(),
             color: const Color(0xFF14B8A6),
-            width: 12,
+            width: 16, // Optimal width to prevent overlap
             borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(4),
-              topRight: Radius.circular(4),
+              topLeft: Radius.circular(3),
+              topRight: Radius.circular(3),
             ),
           ),
           BarChartRodData(
-            toY: (data['expense'] ?? 0).toDouble(),
+            toY: (chartData['expense'] ?? 0).toDouble(),
             color: const Color(0xFFEF4444),
-            width: 12,
+            width: 16, // Optimal width to prevent overlap
             borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(4),
-              topRight: Radius.circular(4),
+              topLeft: Radius.circular(3),
+              topRight: Radius.circular(3),
             ),
           ),
         ],

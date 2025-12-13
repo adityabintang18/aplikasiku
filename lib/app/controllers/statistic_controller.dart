@@ -23,8 +23,23 @@ class StatisticController extends GetxController {
 
   @override
   void onInit() {
-    fetchStatistics();
     super.onInit();
+    // Don't fetch data here to avoid blocking UI initialization
+    // Data akan di-fetch di onReady() atau ketika halaman dibuka
+  }
+
+  @override
+  void onReady() {
+    super.onReady();
+    // Fetch data after UI is ready to avoid freeze
+    _fetchDataWithDelay();
+  }
+
+  /// Fetch data with delay to prevent UI freeze
+  Future<void> _fetchDataWithDelay() async {
+    // Small delay to ensure UI is fully rendered
+    await Future.delayed(const Duration(milliseconds: 100));
+    fetchStatistics();
   }
 
   Future<void> fetchStatistics({

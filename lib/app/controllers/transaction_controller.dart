@@ -368,17 +368,18 @@ class TransactionController extends GetxController {
         jenisKategori: int.tryParse(transaction.namaJenisKategori),
         description: transaction.description,
         photo: photo,
+        effectiveMonth: transaction.effectiveMonth,
       );
 
       _logger.i('Transaction created successfully: $result');
       _logger.i(
-        'Request data sent: title=${transaction.title}, amount=${transaction.amount}, is_income=${transaction.isIncome}, date=${transaction.date}, category=${transaction.category}, jenis_kategori=${transaction.namaJenisKategori}, description=${transaction.description}, photo=${photo?.path}',
+        'Request data sent: title=${transaction.title}, amount=${transaction.amount}, is_income=${transaction.isIncome}, date=${transaction.date}, category=${transaction.category}, jenis_kategori=${transaction.namaJenisKategori}, description=${transaction.description}, effective_month=${transaction.effectiveMonth}, photo=${photo?.path}',
       );
 
       // Refresh transactions list
       await fetchTransactions();
 
-      _logger.i('Transaction added with image support');
+      _logger.i('Transaction added with image support and effective month');
     } catch (e) {
       _logger.e('Error addTransaction', error: e);
       rethrow; // Re-throw so UI can handle the error

@@ -30,9 +30,8 @@ class FinansialService extends BaseApiService {
       queryParameters: queryParameters.isNotEmpty ? queryParameters : null,
     );
 
-    final data = response.data is List
-        ? response.data
-        : (response.data['data'] ?? []);
+    final data =
+        response.data is List ? response.data : (response.data['data'] ?? []);
 
     return (data as List).map((e) => FinansialModel.fromJson(e)).toList();
   }
@@ -45,9 +44,8 @@ class FinansialService extends BaseApiService {
       queryParameters: {'jenis_kategori': jenisKategori},
     );
 
-    final data = response.data is List
-        ? response.data
-        : (response.data['data'] ?? []);
+    final data =
+        response.data is List ? response.data : (response.data['data'] ?? []);
 
     return (data as List).map((e) => FinansialModel.fromJson(e)).toList();
   }
@@ -74,9 +72,8 @@ class FinansialService extends BaseApiService {
   Future<List<Map<String, dynamic>>> getCategories() async {
     final response = await client.get('$baseUrl/categories');
 
-    final data = response.data is List
-        ? response.data
-        : (response.data['data'] ?? []);
+    final data =
+        response.data is List ? response.data : (response.data['data'] ?? []);
 
     return (data as List).map((e) => e as Map<String, dynamic>).toList();
   }
@@ -84,9 +81,8 @@ class FinansialService extends BaseApiService {
   Future<List<Map<String, dynamic>>> getTransactionTypes() async {
     final response = await client.get('$baseUrl/ref/jenis');
 
-    final data = response.data is List
-        ? response.data
-        : (response.data['data'] ?? []);
+    final data =
+        response.data is List ? response.data : (response.data['data'] ?? []);
 
     return (data as List).map((e) => e as Map<String, dynamic>).toList();
   }
@@ -112,6 +108,7 @@ class FinansialService extends BaseApiService {
     int? jenisKategori,
     String? description,
     XFile? photo,
+    String? effectiveMonth,
   }) async {
     // Prepare form data
     final formData = FormData.fromMap({
@@ -123,6 +120,8 @@ class FinansialService extends BaseApiService {
       if (jenisKategori != null) 'jenis_kategori': jenisKategori.toString(),
       if (description != null && description.isNotEmpty)
         'description': description,
+      if (effectiveMonth != null && effectiveMonth.isNotEmpty)
+        'effective_month': effectiveMonth,
     });
 
     // Add photo if provided

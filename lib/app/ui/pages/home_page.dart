@@ -20,7 +20,8 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage>
+    with SingleTickerProviderStateMixin {
   final controller = Get.find<HomeController>();
   final logger = Logger();
 
@@ -32,14 +33,25 @@ class _HomePageState extends State<HomePage> {
   static const Color primary = Color(0xFF0F172A);
 
   bool _firstLoad = true;
+  late AnimationController _shimmerController;
 
   @override
   void initState() {
     super.initState();
+    _shimmerController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    )..repeat();
     Future.microtask(() async {
       await controller.onPageEnter(); // Auto refresh when entering page
       if (mounted) setState(() => _firstLoad = false);
     });
+  }
+
+  @override
+  void dispose() {
+    _shimmerController.dispose();
+    super.dispose();
   }
 
   @override
@@ -87,10 +99,8 @@ class _HomePageState extends State<HomePage> {
                     child: _buildTransactionTypeFilter(),
                   ),
 
-                  const SizedBox(height: 10),
-
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.all(16),
                     child: _buildSummaryCard(summary, currency),
                   ),
                   // Full width summary card (no padding constraint)
@@ -336,7 +346,7 @@ class _HomePageState extends State<HomePage> {
       if (controller.isSummaryLoading.value &&
           !controller.isInitialLoading.value) {
         return Container(
-          width: MediaQuery.of(context).size.width,
+          width: double.infinity,
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [primary, primary.withOpacity(0.8)],
@@ -354,20 +364,47 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-            child: const Column(
+            padding: const EdgeInsets.all(20),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                AppLoadingWidget(
-                  type: LoadingType.skeleton,
-                  size: 14,
-                  color: Colors.white,
+                Text(
+                  "Total Balance",
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 14,
+                  ),
                 ),
-                SizedBox(height: 8),
-                AppLoadingWidget(
-                  type: LoadingType.skeleton,
-                  size: 36,
-                  color: Colors.white,
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: 28,
+                          height: 36,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          "Loading...",
+                          style: const TextStyle(
+                            fontSize: 36,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -379,7 +416,7 @@ class _HomePageState extends State<HomePage> {
       final balance = !isEmpty ? (summary['total']['balance'] ?? 0) : 0;
 
       return Container(
-        width: MediaQuery.of(context).size.width,
+        width: double.infinity,
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [primary, primary.withOpacity(0.8)],
@@ -397,7 +434,7 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -408,12 +445,20 @@ class _HomePageState extends State<HomePage> {
                   fontSize: 14,
                 ),
               ),
-              Text(
-                currency.format(balance ?? 0),
-                style: const TextStyle(
-                  fontSize: 36,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    currency.format(balance ?? 0),
+                    style: const TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -664,7 +709,7 @@ class _HomePageState extends State<HomePage> {
       // Handle italic text in parentheses - make it a separate line with proper formatting
       if (cleanedTip.contains('*(') && cleanedTip.contains(')*')) {
         cleanedTip = cleanedTip.replaceAllMapped(
-          RegExp(r'\\*\\((.*?)\\)'),
+          RegExp(r'\*\((.*?)\)\*'),
           (match) => '\n\n(${match.group(1)})',
         );
       }
