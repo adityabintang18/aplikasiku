@@ -11,21 +11,16 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      packages: write
-      id-token: write
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
         flutter-version: '3.38.4'
-        channel: 'stable'
-        cache: false
+        channel: stable
 
     - name: Verify Flutter and Dart versions
       run: |
@@ -35,149 +30,63 @@ jobs:
     - name: Install dependencies
       run: flutter pub get
 
-    - name: Get version info from pubspec.yaml
+    # 🔹 Ambil versi (format: 1.0.1)
+    - name: Get version from pubspec.yaml
       id: version
       run: |
-        # Extract version from pubspec.yaml
-        VERSION_LINE=$(grep "version:" pubspec.yaml)
-        VERSION_FULL=${VERSION_LINE#version: }
-        VERSION_FULL=$(echo $VERSION_FULL | xargs) # trim whitespace
-        
-        # Split version by '+' to get version name and build number
-        IFS='+' read -ra VERSION_PARTS <<< "$VERSION_FULL"
-        VERSION_NAME="${VERSION_PARTS[0]}"
-        BUILD_NUMBER="${VERSION_PARTS[1]}"
-        
-        echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_OUTPUT
-        echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_OUTPUT
-        echo "APK_NAME=aplikasiku-$VERSION_NAME-$BUILD_NUMBER.apk" >> $GITHUB_OUTPUT
-        echo "TAG_NAME=v$VERSION_NAME+$BUILD_NUMBER" >> $GITHUB_OUTPUT
-        echo "Download URL: https://github.com/${{ github.repository }}/releases/download/v$VERSION_NAME+$BUILD_NUMBER/app-$VERSION_NAME-$BUILD_NUMBER.apk"
-        
+        VERSION_LINE=$(grep "^version:" pubspec.yaml)
+        VERSION=${VERSION_LINE#version: }
+        VERSION=$(echo $VERSION | xargs)
+
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "APK_NAME=aplikasiku-$VERSION.apk" >> $GITHUB_OUTPUT
+        echo "TAG_NAME=v$VERSION" >> $GITHUB_OUTPUT
+
     - name: Build APK Release
       run: flutter build apk --release
 
     - name: Rename APK
       run: |
-        mv build/app/outputs/flutter-apk/app-release.apk ${{ steps.version.outputs.APK_NAME }}
-        ls -la ${{ steps.version.outputs.APK_NAME }}
+        mv build/app/outputs/flutter-apk/app-release.apk \
+           ${{ steps.version.outputs.APK_NAME }}
+        ls -la
 
-    - name: Check for existing release
-      id: check_release
-      run: |
-        TAG_NAME="${{ steps.version.outputs.TAG_NAME }}"
-        echo "Checking for existing release with tag: $TAG_NAME"
-        
-        # Use GitHub CLI if available, otherwise use curl
-        if command -v gh &> /dev/null; then
-          echo "Using GitHub CLI to check..."
-          if gh release view "$TAG_NAME" --repo "${{ github.repository }}" &> /dev/null; then
-            echo "RELEASE_EXISTS=true" >> $GITHUB_OUTPUT
-            echo "Release exists, will delete and recreate"
-          else
-            echo "RELEASE_EXISTS=false" >> $GITHUB_OUTPUT
-            echo "No existing release found"
-          fi
-        else
-          # Fallback to curl
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG_NAME")
-          
-          if [ "$RESPONSE" -eq 200 ]; then
-            echo "RELEASE_EXISTS=true" >> $GITHUB_OUTPUT
-            echo "Release exists, will delete and recreate"
-          else
-            echo "RELEASE_EXISTS=false" >> $GITHUB_OUTPUT
-            echo "No existing release found"
-          fi
-        fi
-
+    # 🔹 Hapus release lama jika tag sama
     - name: Delete existing release if exists
-      if: steps.check_release.outputs.RELEASE_EXISTS == 'true'
       run: |
-        TAG_NAME="${{ steps.version.outputs.TAG_NAME }}"
-        echo "Deleting existing release with tag: $TAG_NAME"
-        
-        # Use GitHub CLI if available
-        if command -v gh &> /dev/null; then
-          echo "Using GitHub CLI to delete..."
-          gh release delete "$TAG_NAME" --repo "${{ github.repository }}" --yes || true
-        else
-          # Get release ID first
-          RELEASE_ID=$(curl -s \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG_NAME" | \
-            jq -r '.id')
-          
-          if [ "$RELEASE_ID" != "null" ] && [ "$RELEASE_ID" != "" ]; then
-            echo "Deleting release with ID: $RELEASE_ID"
-            curl -X DELETE \
-              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-              -H "Accept: application/vnd.github.v3+json" \
-              "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID"
-          fi
-        fi
-        
-        # Also delete the tag
-        echo "Deleting tag: $TAG_NAME"
-        git tag -d "$TAG_NAME" || true
-        git push origin ":refs/tags/$TAG_NAME" || true
+        TAG="${{ steps.version.outputs.TAG_NAME }}"
+        gh release delete "$TAG" --repo "${{ github.repository }}" --yes || true
+        git tag -d "$TAG" || true
+        git push origin ":refs/tags/$TAG" || true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+    # 🔹 Create GitHub Release
     - name: Create GitHub Release
-      id: create_release
       uses: softprops/action-gh-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ steps.version.outputs.TAG_NAME }}
-        name: Release ${{ steps.version.outputs.VERSION_NAME }} (Build ${{ steps.version.outputs.BUILD_NUMBER }})
+        name: Release ${{ steps.version.outputs.VERSION }}
         body: |
-          ## 🚀 Aplikasiku Release ${{ steps.version.outputs.VERSION_NAME }}
-          
-          **Build Number:** ${{ steps.version.outputs.BUILD_NUMBER }}
-          
+          ## 🚀 Aplikasiku v${{ steps.version.outputs.VERSION }}
+
           ### 📱 Download
-          - **APK:** [app-${{ steps.version.outputs.VERSION_NAME }}-${{ steps.version.outputs.BUILD_NUMBER }}.apk](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.TAG_NAME }}/${{ steps.version.outputs.APK_NAME }})
-          
+          - **APK:** ${{ steps.version.outputs.APK_NAME }}
+
           ### ✨ What's New
-          - Latest updates and improvements
-          - Bug fixes and optimizations
-          
-          ---
-          *Built with ❤️ using GitHub Actions*
-        draft: false
-        prerelease: false
-        generate_release_notes: true
+          - Bug fixes & improvements
         files: |
           ${{ steps.version.outputs.APK_NAME }}
 
-    - name: Extract Download URL
-      id: extract_url
-      run: |
-        DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.TAG_NAME }}/${{ steps.version.outputs.APK_NAME }}"
-        echo "DOWNLOAD_URL=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
-
+    # 🔹 Update versi ke backend (Lumen)
     - name: Update Version via Lumen API
       run: |
-        # Update version to Lumen API
-        FULL_VERSION="${{ steps.version.outputs.VERSION_NAME }}+${{ steps.version.outputs.BUILD_NUMBER }}"
-        echo "Updating version: $FULL_VERSION"
         curl -X POST ${{ secrets.API_BASE_URL }}/api/version/update \
           -H "Authorization: Bearer ${{ secrets.API_KEY }}" \
           -H "Content-Type: application/json" \
           -d "{
             \"platform\": \"android\",
-            \"version\": \"$FULL_VERSION\"
+            \"version\": \"${{ steps.version.outputs.VERSION }}\"
           }"
-
-    - name: Show Success Message
-      run: |
-        echo "✅ APK built successfully!"
-        echo "📦 File: ${{ steps.version.outputs.APK_NAME }}"
-        echo "🏷️  Tag: ${{ steps.version.outputs.TAG_NAME }}"
-        echo "🔗 Release URL: ${{ steps.create_release.outputs.html_url }}"
-        echo "⬇️  Download URL: ${{ steps.extract_url.outputs.DOWNLOAD_URL }}"
-        echo "🚀 Version update sent to Lumen API"
